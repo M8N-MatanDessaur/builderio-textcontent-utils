@@ -1,4 +1,5 @@
 import { BuilderContent } from './fetchBuilderTextContent';
+import type { BuilderContentResponse } from './extractBuilderContent';
 
 /**
  * Search interface to represent a search result
@@ -23,19 +24,24 @@ export interface SearchOptions {
 
 /**
  * Search through Builder.io content for matching text
- * @param content - The Builder.io content to search through
+ * @param contentInput - The Builder.io content to search through (can be standard content or BuilderContentResponse from v0.2.0)
  * @param searchTerm - The term to search for
  * @param options - Search configuration options
  * @returns Array of search results sorted by relevance
  */
 export function searchBuilderContent(
-  content: BuilderContent,
+  contentInput: BuilderContent | BuilderContentResponse,
   searchTerm: string,
   options: SearchOptions = {}
 ): SearchResult[] {
   if (!searchTerm || searchTerm.trim() === '') {
     return [];
   }
+  
+  // Extract content if the new format is provided (v0.2.0+)
+  const contentToSearch: Record<string, string[]> = 'content' in contentInput 
+    ? contentInput.content as Record<string, string[]>
+    : contentInput as Record<string, string[]>;
 
   const {
     caseSensitive = false,
@@ -53,7 +59,13 @@ export function searchBuilderContent(
     : null;
 
   // Process each page and its text content
-  Object.entries(content).forEach(([pageTitle, texts]) => {
+  Object.entries(contentToSearch).forEach(([pageTitle, texts]) => {
+    // Ensure texts is an array
+    if (!Array.isArray(texts)) {
+      console.warn(`Expected texts for "${pageTitle}" to be an array, got ${typeof texts}`);
+      return; // Skip this entry
+    }
+    
     texts.forEach((text) => {
       const normalizedText = caseSensitive ? text : text.toLowerCase();
       

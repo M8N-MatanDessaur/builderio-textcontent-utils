@@ -261,6 +261,10 @@ MIT
 
 ## Changelog
 
+### v0.2.1
+- Fixed searchBuilderContent to work with the new URL format
+- Added type safety improvements for better compatibility between different response formats
+
 ### v0.2.0
 - Added page URL retrieval functionality with `includeUrl` option
 - Updated return types to support content and URLs in the same response

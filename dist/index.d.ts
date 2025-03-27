@@ -224,11 +224,11 @@ interface SearchOptions {
 }
 /**
  * Search through Builder.io content for matching text
- * @param content - The Builder.io content to search through
+ * @param contentInput - The Builder.io content to search through (can be standard content or BuilderContentResponse from v0.2.0)
  * @param searchTerm - The term to search for
  * @param options - Search configuration options
  * @returns Array of search results sorted by relevance
  */
-declare function searchBuilderContent(content: BuilderContent, searchTerm: string, options?: SearchOptions): SearchResult[];
+declare function searchBuilderContent(contentInput: BuilderContent | BuilderContentResponse, searchTerm: string, options?: SearchOptions): SearchResult[];
 
 export { type BuilderContent, type BuilderPluginOptions, type ExtractBuilderContentOptions, type FetchBuilderContentOptions, type SearchOptions, type SearchResult, createBuilderClient, extractBuilderContent, fetchBuilderContent, generateMetadataFromContent, searchBuilderContent };

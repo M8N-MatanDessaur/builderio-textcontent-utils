@@ -196,10 +196,11 @@ function generateMetadataFromContent(content, options = {}) {
 }
 
 // src/utils/searchBuilderContent.ts
-function searchBuilderContent(content, searchTerm, options = {}) {
+function searchBuilderContent(contentInput, searchTerm, options = {}) {
   if (!searchTerm || searchTerm.trim() === "") {
     return [];
   }
+  const contentToSearch = "content" in contentInput ? contentInput.content : contentInput;
   const {
     caseSensitive = false,
     wholeWord = false,
@@ -209,7 +210,11 @@ function searchBuilderContent(content, searchTerm, options = {}) {
   const normalizedSearchTerm = caseSensitive ? searchTerm : searchTerm.toLowerCase();
   const results = [];
   const wholeWordRegex = wholeWord ? new RegExp(`\\b${escapeRegExp(normalizedSearchTerm)}\\b`, caseSensitive ? "g" : "gi") : null;
-  Object.entries(content).forEach(([pageTitle, texts]) => {
+  Object.entries(contentToSearch).forEach(([pageTitle, texts]) => {
+    if (!Array.isArray(texts)) {
+      console.warn(`Expected texts for "${pageTitle}" to be an array, got ${typeof texts}`);
+      return;
+    }
     texts.forEach((text) => {
       const normalizedText = caseSensitive ? text : text.toLowerCase();
       let matchScore = 0;
