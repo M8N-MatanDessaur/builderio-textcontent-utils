@@ -37,10 +37,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/builder-io/content-utils.git"
+    "url": "https://github.com/M8N-MatanDessaur/builderio-textcontent-utils.git"
   },
   "bugs": {
-    "url": "https://github.com/builder-io/content-utils/issues"
+    "url": "https://github.com/M8N-MatanDessaur/builderio-textcontent-utils/issues"
   },
-  "homepage": "https://github.com/builder-io/content-utils#readme"
+  "homepage": "https://github.com/M8N-MatanDessaur/builderio-textcontent-utils"
 }
