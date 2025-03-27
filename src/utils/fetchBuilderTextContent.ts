@@ -28,8 +28,29 @@ export async function fetchBuilderTextContent(
 
     // Function to clean HTML tags and trim text
     const cleanText = (text: string | any): string => {
+      if (!text) return "";
+      
       return String(text)
+        // Remove HTML tags
         .replace(/<[^>]*>/g, "")
+        // Replace common HTML entities
+        .replace(/&nbsp;/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        // Replace decimal and hex HTML entities
+        .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
+        .replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
+        // Remove markdown formatting symbols
+        .replace(/\*\*(.+?)\*\*/g, "$1") // Bold
+        .replace(/\*(.+?)\*/g, "$1")     // Italic
+        .replace(/\_\_(.+?)\_\_/g, "$1") // Bold
+        .replace(/\_(.+?)\_/g, "$1")     // Italic
+        .replace(/\~\~(.+?)\~\~/g, "$1") // Strikethrough
+        .replace(/\`(.+?)\`/g, "$1")     // Code
+        // Normalize whitespace
         .replace(/\s+/g, " ")
         .trim();
     };
