@@ -36,6 +36,16 @@ interface FetchBuilderContentOptions {
     query?: Record<string, any>;
     /** Custom fetch implementation (useful for server environments like Next.js) */
     fetchImplementation?: typeof fetch;
+    /** Include page URLs in the response (defaults to false) */
+    includeUrl?: boolean;
+}
+/**
+ * Response type for fetchBuilderContent including URLs
+ * @typedef {Object} BuilderContentResponse
+ */
+interface BuilderContentResponse {
+    content: Record<string, string[]>;
+    urls?: Record<string, string>;
 }
 /**
  * Extracts text content from Builder.io content
@@ -62,7 +72,7 @@ declare function extractBuilderContent(builderResults: any[], options?: ExtractB
  * @async
  * @param {string} apiKey - Builder.io API key
  * @param {FetchBuilderContentOptions} [options={}] - Configuration options
- * @returns {Promise<Record<string, string[]>>} Promise resolving to formatted content
+ * @returns {Promise<BuilderContentResponse | Record<string, string[]>>} Promise resolving to formatted content and optional URLs
  * @throws {Error} Throws if API key is missing or if the API request fails
  * @example
  * ```typescript
@@ -70,11 +80,12 @@ declare function extractBuilderContent(builderResults: any[], options?: ExtractB
  * const content = await fetchBuilderContent('YOUR_API_KEY', {
  *   locale: 'en-US',
  *   model: 'page',
- *   query: { 'data.slug': 'home' }
+ *   query: { 'data.slug': 'home' },
+ *   includeUrl: true // Set to true to include URLs
  * });
  * ```
  */
-declare function fetchBuilderContent(apiKey: string, options?: FetchBuilderContentOptions): Promise<Record<string, string[]>>;
+declare function fetchBuilderContent(apiKey: string, options?: FetchBuilderContentOptions): Promise<BuilderContentResponse | Record<string, string[]>>;
 
 /**
  * @file Builder.io server-side integration utilities
@@ -140,9 +151,9 @@ declare function createBuilderClient(options: BuilderPluginOptions): {
     /**
      * Fetch text content from Builder.io
      * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
-     * @returns {Promise<Record<string, string[]>>} Promise resolving to text content
+     * @returns {Promise<Record<string, string[]> | BuilderContentResponse>} Promise resolving to text content and optionally URLs
      */
-    fetchTextContent: (fetchOptions?: Omit<FetchBuilderContentOptions, "apiKey" | "locale" | "apiUrl" | "textFields" | "fetchImplementation">) => Promise<Record<string, string[]>>;
+    fetchTextContent: (fetchOptions?: Omit<FetchBuilderContentOptions, "apiKey" | "locale" | "apiUrl" | "textFields" | "fetchImplementation">) => Promise<Record<string, string[]> | BuilderContentResponse>;
     /**
      * Extract text from Builder.io content data
      * @param {any[]} builderResults - Raw Builder.io data
@@ -190,9 +201,7 @@ declare function generateMetadataFromContent(content: Record<string, string[]>, 
  * Server-side utility to fetch and extract text content from Builder.io API
  * @file fetchBuilderTextContent.ts
  */
-interface BuilderContent {
-    [pageTitle: string]: string[];
-}
+type BuilderContent = Record<string, string[]>;
 
 /**
  * Search interface to represent a search result

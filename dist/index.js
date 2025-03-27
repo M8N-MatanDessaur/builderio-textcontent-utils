@@ -119,7 +119,8 @@ function fetchBuilderContent(_0) {
       contentTransformer,
       model = "page",
       query = {},
-      fetchImplementation
+      fetchImplementation,
+      includeUrl = false
     } = options;
     if (!apiKey) {
       throw new Error("Builder API key is required");
@@ -138,13 +139,27 @@ function fetchBuilderContent(_0) {
     const data = yield response.json();
     if (!data.results || data.results.length === 0) {
       console.warn("No results found.");
-      return {};
+      return includeUrl ? { content: {}, urls: {} } : {};
     }
-    return extractBuilderContent(data.results, {
+    const content = extractBuilderContent(data.results, {
       locale,
       textFields,
       contentTransformer
     });
+    if (includeUrl) {
+      const urls = {};
+      data.results.forEach((result) => {
+        var _a, _b, _c, _d;
+        if (result.name && (((_a = result.data) == null ? void 0 : _a.url) || ((_b = result.data) == null ? void 0 : _b.path))) {
+          urls[result.name] = ((_c = result.data) == null ? void 0 : _c.url) || ((_d = result.data) == null ? void 0 : _d.path);
+        }
+      });
+      return {
+        content,
+        urls
+      };
+    }
+    return content;
   });
 }
 
@@ -164,7 +179,7 @@ function createBuilderClient(options) {
     /**
      * Fetch text content from Builder.io
      * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
-     * @returns {Promise<Record<string, string[]>>} Promise resolving to text content
+     * @returns {Promise<Record<string, string[]> | BuilderContentResponse>} Promise resolving to text content and optionally URLs
      */
     fetchTextContent: (..._0) => __async(this, [..._0], function* (fetchOptions = {}) {
       return fetchBuilderContent(apiKey, __spreadValues({
