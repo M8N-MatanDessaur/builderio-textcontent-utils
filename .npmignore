@@ -1,0 +1,34 @@
+# Development files
+.next/
+node_modules/
+
+# Environment variables
+.env
+
+# Source files (only dist is needed for npm)
+src/
+
+# Configuration files that aren't needed in the package
+tsconfig.json
+tsconfig.build.json
+
+# Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test files
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Git files
+.git/
+.gitignore
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
