@@ -66,7 +66,8 @@ module.exports = __toCommonJS(index_exports);
 // src/utils/extractBuilderContent.ts
 var DEFAULT_TEXT_FIELDS = ["text", "title", "textContent", "description"];
 function cleanText(text) {
-  return String(text).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+  return String(text).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)).replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/\_\_(.+?)\_\_/g, "$1").replace(/\_(.+?)\_/g, "$1").replace(/\~\~(.+?)\~\~/g, "$1").replace(/\`(.+?)\`/g, "$1").replace(/\s+/g, " ").trim();
 }
 function extractTextFieldsFromObject(obj, options) {
   const { locale, textFields } = options;
@@ -333,7 +334,8 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
         return { content: [], error: null };
       }
       const cleanText2 = (text) => {
-        return String(text).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+        if (!text) return "";
+        return String(text).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)).replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/\_\_(.+?)\_\_/g, "$1").replace(/\_(.+?)\_/g, "$1").replace(/\~\~(.+?)\~\~/g, "$1").replace(/\`(.+?)\`/g, "$1").replace(/\s+/g, " ").trim();
       };
       const extractTextFields = (obj) => {
         let texts = [];
