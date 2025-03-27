@@ -4,33 +4,20 @@
  */
 
 // Define TypeScript interfaces
-export interface BuilderContent {
-  [pageTitle: string]: string[];
-}
-
-interface BuilderResponse {
-  results?: {
-    data?: {
-      title?: string;
-      blocks?: any[];
-      [key: string]: any;
-    };
-    [key: string]: any;
-  }[];
-  [key: string]: any;
-}
+export type BuilderContent = Record<string, string[]>;
+export type BuilderResponse = { results: any[] };
 
 /**
- * Fetches and processes content from Builder.io API
- * @param apiKey - Builder.io API key
- * @param locale - Locale for content (default: "us-en")
- * @returns Promise containing content and error status
+ * Fetches text content from Builder.io
+ * @param {string} apiKey - Builder.io API key 
+ * @param {string} [locale="us-en"] - Content locale
+ * @returns {Promise<{ content: BuilderContent; urls?: Record<string, string>; error: string | null }>} Promise resolving to text content and URLs
  */
 export async function fetchBuilderTextContent(
   apiKey: string,
   locale: string = "us-en"
-): Promise<{ content: BuilderContent; error: string | null }> {
-  const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}&limit=100`;
+): Promise<{ content: BuilderContent; urls?: Record<string, string>; error: string | null }> {
+  const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' }); // Disable caching for fresh data
@@ -38,7 +25,7 @@ export async function fetchBuilderTextContent(
 
     if (!data.results || data.results.length === 0) {
       console.warn("No results found.");
-      return { content: {}, error: null };
+      return { content: {}, urls: {}, error: null };
     }
 
     // Function to clean HTML tags and trim text
@@ -82,6 +69,8 @@ export async function fetchBuilderTextContent(
     };
 
     let formattedContent: BuilderContent = {};
+    // Object to store page URLs
+    const urls: Record<string, string> = {};
 
     // Process each result and extract locale-specific content
     data.results.forEach((result) => {
@@ -90,12 +79,17 @@ export async function fetchBuilderTextContent(
         ? extractTextFields(result.data.blocks)
         : [];
 
+      // Extract URL from the result
+      if (result.data?.url || result.data?.path) {
+        urls[pageTitle] = result.data?.url || result.data?.path;
+      }
+
       if (pageTexts.length > 0) {
         formattedContent[pageTitle] = pageTexts;
       }
     });
 
-    return { content: formattedContent, error: null };
+    return { content: formattedContent, urls, error: null };
   } catch (err: any) {
     console.error("Error fetching content:", err);
     return { content: {}, error: err.message };

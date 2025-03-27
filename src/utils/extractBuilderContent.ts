@@ -38,6 +38,17 @@ export interface FetchBuilderContentOptions {
   query?: Record<string, any>;
   /** Custom fetch implementation (useful for server environments like Next.js) */
   fetchImplementation?: typeof fetch;
+  /** Include page URLs in the response (defaults to false) */
+  includeUrl?: boolean;
+}
+
+/**
+ * Response type for fetchBuilderContent including URLs
+ * @typedef {Object} BuilderContentResponse
+ */
+export interface BuilderContentResponse {
+  content: Record<string, string[]>;
+  urls?: Record<string, string>;
 }
 
 /**
@@ -168,7 +179,7 @@ export function extractBuilderContent(
  * @async
  * @param {string} apiKey - Builder.io API key
  * @param {FetchBuilderContentOptions} [options={}] - Configuration options
- * @returns {Promise<Record<string, string[]>>} Promise resolving to formatted content
+ * @returns {Promise<BuilderContentResponse | Record<string, string[]>>} Promise resolving to formatted content and optional URLs
  * @throws {Error} Throws if API key is missing or if the API request fails
  * @example
  * ```typescript
@@ -176,14 +187,15 @@ export function extractBuilderContent(
  * const content = await fetchBuilderContent('YOUR_API_KEY', {
  *   locale: 'en-US',
  *   model: 'page',
- *   query: { 'data.slug': 'home' }
+ *   query: { 'data.slug': 'home' },
+ *   includeUrl: true // Set to true to include URLs
  * });
  * ```
  */
 export async function fetchBuilderContent(
   apiKey: string,
   options: FetchBuilderContentOptions = {}
-): Promise<Record<string, string[]>> {
+): Promise<BuilderContentResponse | Record<string, string[]>> {
   const {
     locale = "us-en",
     apiUrl = "https://cdn.builder.io/api/v3/content",
@@ -192,7 +204,8 @@ export async function fetchBuilderContent(
     contentTransformer,
     model = "page",
     query = {},
-    fetchImplementation
+    fetchImplementation,
+    includeUrl = false
   } = options;
 
   if (!apiKey) {
@@ -222,13 +235,33 @@ export async function fetchBuilderContent(
 
   if (!data.results || data.results.length === 0) {
     console.warn("No results found.");
-    return {};
+    return includeUrl ? { content: {}, urls: {} } : {};
   }
 
   // Extract content
-  return extractBuilderContent(data.results, {
+  const content = extractBuilderContent(data.results, {
     locale,
     textFields,
     contentTransformer
   });
+
+  // If includeUrl is true, extract URLs and return a combined object
+  if (includeUrl) {
+    const urls: Record<string, string> = {};
+    
+    // Extract URLs from each result
+    data.results.forEach((result: any) => {
+      if (result.name && (result.data?.url || result.data?.path)) {
+        urls[result.name] = result.data?.url || result.data?.path;
+      }
+    });
+    
+    return {
+      content,
+      urls
+    };
+  }
+
+  // For backward compatibility, return just the content
+  return content;
 }

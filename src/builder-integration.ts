@@ -5,7 +5,7 @@
  */
 
 import { extractBuilderContent, fetchBuilderContent } from './utils/extractBuilderContent';
-import type { ExtractBuilderContentOptions, FetchBuilderContentOptions } from './utils/extractBuilderContent';
+import type { ExtractBuilderContentOptions, FetchBuilderContentOptions, BuilderContentResponse } from './utils/extractBuilderContent';
 
 /**
  * Options for the Builder.io content client
@@ -85,7 +85,7 @@ export function createBuilderClient(options: BuilderPluginOptions) {
     /**
      * Fetch text content from Builder.io
      * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
-     * @returns {Promise<Record<string, string[]>>} Promise resolving to text content
+     * @returns {Promise<Record<string, string[]> | BuilderContentResponse>} Promise resolving to text content and optionally URLs
      */
     fetchTextContent: async (fetchOptions: Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'> = {}) => {
       return fetchBuilderContent(apiKey, {
