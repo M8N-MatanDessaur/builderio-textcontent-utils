@@ -1,36 +1,54 @@
-import { BuilderContent } from './fetchBuilderTextContent';
-import type { BuilderContentResponse } from './extractBuilderContent';
+import { BuilderPageContent } from './extractBuilderContent';
 
 /**
  * Search interface to represent a search result
  */
 export interface SearchResult {
+  /** Title of the page containing the match */
   pageTitle: string;
+  /** URL of the page containing the match */
+  pageUrl: string;
+  /** Full text containing the match */
   text: string;
-  matchScore: number; // Higher score means better match
-  excerpt: string;    // Context showing words around the match
-  matchPosition: number; // Position of the match in the text
+  /** Score representing match relevance */
+  matchScore: number;
+  /** Context excerpt showing words around the match */
+  excerpt: string;
+  /** Position of the match in the text */
+  matchPosition: number;
 }
 
 /**
  * Search options to configure search behavior
  */
 export interface SearchOptions {
+  /** Whether search is case-sensitive (default: false) */
   caseSensitive?: boolean;
+  /** Whether to match whole words only (default: false) */
   wholeWord?: boolean;
-  minScore?: number; // Minimum score to include in results
-  contextWords?: number; // Number of words to include before and after match
+  /** Minimum score to include in results (default: 0.1) */
+  minScore?: number;
+  /** Number of words to include before and after match (default: 5) */
+  contextWords?: number;
 }
 
 /**
  * Search through Builder.io content for matching text
- * @param contentInput - The Builder.io content to search through (can be standard content or BuilderContentResponse from v0.2.0)
+ * @param content - The Builder.io content to search through
  * @param searchTerm - The term to search for
  * @param options - Search configuration options
  * @returns Array of search results sorted by relevance
+ * 
+ * @example
+ * ```typescript
+ * const results = searchBuilderContent(content, 'search term', {
+ *   caseSensitive: false,
+ *   contextWords: 8
+ * });
+ * ```
  */
 export function searchBuilderContent(
-  contentInput: BuilderContent | BuilderContentResponse,
+  content: BuilderPageContent[],
   searchTerm: string,
   options: SearchOptions = {}
 ): SearchResult[] {
@@ -38,11 +56,6 @@ export function searchBuilderContent(
     return [];
   }
   
-  // Extract content if the new format is provided (v0.2.0+)
-  const contentToSearch: Record<string, string[]> = 'content' in contentInput 
-    ? contentInput.content as Record<string, string[]>
-    : contentInput as Record<string, string[]>;
-
   const {
     caseSensitive = false,
     wholeWord = false,
@@ -59,14 +72,14 @@ export function searchBuilderContent(
     : null;
 
   // Process each page and its text content
-  Object.entries(contentToSearch).forEach(([pageTitle, texts]) => {
-    // Ensure texts is an array
-    if (!Array.isArray(texts)) {
-      console.warn(`Expected texts for "${pageTitle}" to be an array, got ${typeof texts}`);
+  content.forEach((page) => {
+    // Ensure content is an array
+    if (!Array.isArray(page.content)) {
+      console.warn(`Expected content for "${page.title}" to be an array, got ${typeof page.content}`);
       return; // Skip this entry
     }
     
-    texts.forEach((text) => {
+    page.content.forEach((text) => {
       const normalizedText = caseSensitive ? text : text.toLowerCase();
       
       // Calculate match score 
@@ -88,7 +101,8 @@ export function searchBuilderContent(
           const excerpt = generateExcerpt(text, match.index, match[0].length, contextWords);
           
           results.push({
-            pageTitle,
+            pageTitle: page.title,
+            pageUrl: page.url,
             text,
             matchScore: calculateFinalScore(matchScore, text.length),
             excerpt,
@@ -109,7 +123,8 @@ export function searchBuilderContent(
           const excerpt = generateExcerpt(text, position, normalizedSearchTerm.length, contextWords);
           
           results.push({
-            pageTitle,
+            pageTitle: page.title,
+            pageUrl: page.url,
             text,
             matchScore: calculateFinalScore(matchScore, text.length),
             excerpt,
@@ -200,9 +215,9 @@ function generateExcerpt(
   
   excerpt += fullWordArray
     .slice(startIndex, endIndex)
-    .map(w => w.word)
+    .map(item => item.isMatch ? `**${item.word}**` : item.word)
     .join(' ');
-    
+  
   if (endIndex < fullWordArray.length) excerpt += ' ...';
   
   return excerpt;
@@ -215,6 +230,8 @@ function generateExcerpt(
  * @returns Number of occurrences
  */
 function countOccurrences(text: string, searchTerm: string): number {
+  if (!text || !searchTerm) return 0;
+  
   let count = 0;
   let position = text.indexOf(searchTerm);
   

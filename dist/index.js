@@ -57,6 +57,7 @@ __export(index_exports, {
   createBuilderClient: () => createBuilderClient,
   extractBuilderContent: () => extractBuilderContent,
   fetchBuilderContent: () => fetchBuilderContent,
+  fetchBuilderTextContent: () => fetchBuilderTextContent,
   generateMetadataFromContent: () => generateMetadataFromContent,
   searchBuilderContent: () => searchBuilderContent
 });
@@ -95,13 +96,18 @@ function extractBuilderContent(builderResults, options = {}) {
     contentTransformer
   } = options;
   const allTextFields = [.../* @__PURE__ */ new Set([...DEFAULT_TEXT_FIELDS, ...textFields])];
-  let formattedContent = {};
+  let formattedContent = [];
   builderResults.forEach((result) => {
-    var _a, _b;
+    var _a, _b, _c, _d;
     const pageTitle = ((_a = result.data) == null ? void 0 : _a.title) || result.name || `Page-${result.id}`;
-    const pageTexts = ((_b = result.data) == null ? void 0 : _b.blocks) ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields }) : [];
+    const pageUrl = ((_b = result.data) == null ? void 0 : _b.url) || ((_c = result.data) == null ? void 0 : _c.path) || "#";
+    const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields }) : [];
     if (pageTexts.length > 0) {
-      formattedContent[pageTitle] = pageTexts;
+      formattedContent.push({
+        title: pageTitle,
+        url: pageUrl,
+        content: pageTexts
+      });
     }
   });
   if (typeof contentTransformer === "function") {
@@ -116,50 +122,38 @@ function fetchBuilderContent(_0) {
       apiUrl = "https://cdn.builder.io/api/v3/content",
       limit = 100,
       textFields = [],
-      contentTransformer,
       model = "page",
       query = {},
-      fetchImplementation,
-      includeUrl = false
+      contentTransformer,
+      fetchImplementation = fetch
     } = options;
     if (!apiKey) {
-      throw new Error("Builder API key is required");
+      throw new Error("Builder.io API key is required");
     }
-    let url = `${apiUrl}/${model}?apiKey=${apiKey}&limit=${limit}`;
-    Object.entries(query).forEach(([key, value]) => {
-      if (value !== void 0 && value !== null) {
-        url += `&${encodeURIComponent(key)}=${encodeURIComponent(JSON.stringify(value))}`;
-      }
-    });
-    const fetchFn = fetchImplementation || fetch;
-    const response = yield fetchFn(url);
-    if (!response.ok) {
-      throw new Error(`API request failed with status ${response.status}`);
-    }
-    const data = yield response.json();
-    if (!data.results || data.results.length === 0) {
-      console.warn("No results found.");
-      return includeUrl ? { content: {}, urls: {} } : {};
-    }
-    const content = extractBuilderContent(data.results, {
-      locale,
-      textFields,
-      contentTransformer
-    });
-    if (includeUrl) {
-      const urls = {};
-      data.results.forEach((result) => {
-        var _a, _b, _c, _d;
-        if (result.name && (((_a = result.data) == null ? void 0 : _a.url) || ((_b = result.data) == null ? void 0 : _b.path))) {
-          urls[result.name] = ((_c = result.data) == null ? void 0 : _c.url) || ((_d = result.data) == null ? void 0 : _d.path);
-        }
+    try {
+      let apiUrlWithParams = `${apiUrl}/${model}?apiKey=${encodeURIComponent(apiKey)}`;
+      apiUrlWithParams += `&limit=${limit}`;
+      apiUrlWithParams += `&cachebust=${Date.now()}`;
+      Object.entries(query).forEach(([key, value]) => {
+        apiUrlWithParams += `&${encodeURIComponent(key)}=${encodeURIComponent(JSON.stringify(value))}`;
       });
-      return {
-        content,
-        urls
-      };
+      const response = yield fetchImplementation(apiUrlWithParams);
+      if (!response.ok) {
+        throw new Error(`API request failed with status ${response.status}`);
+      }
+      const data = yield response.json();
+      if (!data.results || !Array.isArray(data.results)) {
+        return [];
+      }
+      return extractBuilderContent(data.results, {
+        locale,
+        textFields,
+        contentTransformer
+      });
+    } catch (error) {
+      console.error("Error fetching Builder.io content:", error);
+      throw new Error(`Failed to fetch content: ${error.message}`);
     }
-    return content;
   });
 }
 
@@ -179,7 +173,7 @@ function createBuilderClient(options) {
     /**
      * Fetch text content from Builder.io
      * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
-     * @returns {Promise<Record<string, string[]> | BuilderContentResponse>} Promise resolving to text content and optionally URLs
+     * @returns {Promise<BuilderPageContent[]>} Promise resolving to text content
      */
     fetchTextContent: (..._0) => __async(this, [..._0], function* (fetchOptions = {}) {
       return fetchBuilderContent(apiKey, __spreadValues({
@@ -193,7 +187,7 @@ function createBuilderClient(options) {
      * Extract text from Builder.io content data
      * @param {any[]} builderResults - Raw Builder.io data
      * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'textFields'>} [extractOptions] - Options for extraction
-     * @returns {Record<string, string[]>} Formatted content
+     * @returns {BuilderPageContent[]} Formatted content
      */
     extractContent: (builderResults, extractOptions) => {
       return extractBuilderContent(builderResults, __spreadValues({
@@ -210,24 +204,27 @@ function generateMetadataFromContent(content, options = {}) {
     titleSuffix = "",
     defaultDescription = ""
   } = options;
-  const titles = Object.keys(content);
-  const firstPageTitle = titles.length > 0 ? titles[0] : defaultTitle;
+  const firstPage = content.length > 0 ? content[0] : null;
+  const pageTitle = firstPage ? firstPage.title : defaultTitle;
   let description = defaultDescription;
-  if (titles.length > 0 && content[titles[0]].length > 0) {
-    description = content[titles[0]][0] || defaultDescription;
+  if (firstPage && firstPage.content.length > 0) {
+    description = firstPage.content[0] || defaultDescription;
   }
   return {
-    title: `${titlePrefix}${firstPageTitle}${titleSuffix}`,
-    description
+    title: `${titlePrefix}${pageTitle}${titleSuffix}`,
+    description,
+    openGraph: {
+      title: `${titlePrefix}${pageTitle}${titleSuffix}`,
+      description
+    }
   };
 }
 
 // src/utils/searchBuilderContent.ts
-function searchBuilderContent(contentInput, searchTerm, options = {}) {
+function searchBuilderContent(content, searchTerm, options = {}) {
   if (!searchTerm || searchTerm.trim() === "") {
     return [];
   }
-  const contentToSearch = "content" in contentInput ? contentInput.content : contentInput;
   const {
     caseSensitive = false,
     wholeWord = false,
@@ -237,12 +234,12 @@ function searchBuilderContent(contentInput, searchTerm, options = {}) {
   const normalizedSearchTerm = caseSensitive ? searchTerm : searchTerm.toLowerCase();
   const results = [];
   const wholeWordRegex = wholeWord ? new RegExp(`\\b${escapeRegExp(normalizedSearchTerm)}\\b`, caseSensitive ? "g" : "gi") : null;
-  Object.entries(contentToSearch).forEach(([pageTitle, texts]) => {
-    if (!Array.isArray(texts)) {
-      console.warn(`Expected texts for "${pageTitle}" to be an array, got ${typeof texts}`);
+  content.forEach((page) => {
+    if (!Array.isArray(page.content)) {
+      console.warn(`Expected content for "${page.title}" to be an array, got ${typeof page.content}`);
       return;
     }
-    texts.forEach((text) => {
+    page.content.forEach((text) => {
       const normalizedText = caseSensitive ? text : text.toLowerCase();
       let matchScore = 0;
       let matchFound = false;
@@ -256,7 +253,8 @@ function searchBuilderContent(contentInput, searchTerm, options = {}) {
           matchPosition = match.index;
           const excerpt = generateExcerpt(text, match.index, match[0].length, contextWords);
           results.push({
-            pageTitle,
+            pageTitle: page.title,
+            pageUrl: page.url,
             text,
             matchScore: calculateFinalScore(matchScore, text.length),
             excerpt,
@@ -272,7 +270,8 @@ function searchBuilderContent(contentInput, searchTerm, options = {}) {
           matchPosition = position;
           const excerpt = generateExcerpt(text, position, normalizedSearchTerm.length, contextWords);
           results.push({
-            pageTitle,
+            pageTitle: page.title,
+            pageUrl: page.url,
             text,
             matchScore: calculateFinalScore(matchScore, text.length),
             excerpt,
@@ -314,18 +313,75 @@ function generateExcerpt(text, matchIndex, matchLength, contextWords) {
   const endIndex = Math.min(fullWordArray.length, matchWordIndex + contextWords + 1);
   let excerpt = "";
   if (startIndex > 0) excerpt += "... ";
-  excerpt += fullWordArray.slice(startIndex, endIndex).map((w) => w.word).join(" ");
+  excerpt += fullWordArray.slice(startIndex, endIndex).map((item) => item.isMatch ? `**${item.word}**` : item.word).join(" ");
   if (endIndex < fullWordArray.length) excerpt += " ...";
   return excerpt;
 }
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+// src/utils/fetchBuilderTextContent.ts
+function fetchBuilderTextContent(apiKey, locale = "us-en") {
+  return __async(this, null, function* () {
+    const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}`;
+    try {
+      const response = yield fetch(url, { cache: "no-store" });
+      const data = yield response.json();
+      if (!data.results || data.results.length === 0) {
+        console.warn("No results found.");
+        return { content: [], error: null };
+      }
+      const cleanText2 = (text) => {
+        return String(text).replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+      };
+      const extractTextFields = (obj) => {
+        let texts = [];
+        if (typeof obj === "object" && obj !== null) {
+          Object.entries(obj).forEach(([key, value]) => {
+            if (key === "@type" && value === "@builder.io/core:LocalizedValue") {
+              const localizedText = obj[locale] || obj["Default"];
+              if (localizedText) {
+                texts.push(cleanText2(localizedText));
+              }
+            }
+            if (["text", "title", "textContent", "description"].includes(key) && typeof value === "string") {
+              texts.push(cleanText2(value));
+            }
+            if (typeof value === "object" && value !== null) {
+              texts = texts.concat(extractTextFields(value));
+            }
+          });
+        }
+        return texts;
+      };
+      let formattedContent = [];
+      data.results.forEach((result) => {
+        var _a, _b, _c, _d;
+        const pageTitle = ((_a = result.data) == null ? void 0 : _a.title) || result.name || "Untitled";
+        const pageUrl = ((_b = result.data) == null ? void 0 : _b.url) || ((_c = result.data) == null ? void 0 : _c.path) || "#";
+        const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFields(result.data.blocks) : [];
+        if (pageTexts.length > 0) {
+          formattedContent.push({
+            title: pageTitle,
+            url: pageUrl,
+            content: pageTexts
+          });
+        }
+      });
+      return { content: formattedContent, error: null };
+    } catch (err) {
+      console.error("Error fetching content:", err);
+      return { content: [], error: err.message };
+    }
+  });
+}
 // Annotate the CommonJS export names for ESM import in node:
 0 && (module.exports = {
   createBuilderClient,
   extractBuilderContent,
   fetchBuilderContent,
+  fetchBuilderTextContent,
   generateMetadataFromContent,
   searchBuilderContent
 });

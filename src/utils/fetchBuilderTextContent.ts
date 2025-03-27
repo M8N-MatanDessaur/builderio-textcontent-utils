@@ -3,29 +3,27 @@
  * @file fetchBuilderTextContent.ts
  */
 
-// Define TypeScript interfaces
-export type BuilderContent = Record<string, string[]>;
-export type BuilderResponse = { results: any[] };
+import { BuilderPageContent } from './extractBuilderContent';
 
 /**
  * Fetches text content from Builder.io
  * @param {string} apiKey - Builder.io API key 
  * @param {string} [locale="us-en"] - Content locale
- * @returns {Promise<{ content: BuilderContent; urls?: Record<string, string>; error: string | null }>} Promise resolving to text content and URLs
+ * @returns {Promise<{ content: BuilderPageContent[]; error: string | null }>} Promise resolving to text content
  */
 export async function fetchBuilderTextContent(
   apiKey: string,
   locale: string = "us-en"
-): Promise<{ content: BuilderContent; urls?: Record<string, string>; error: string | null }> {
+): Promise<{ content: BuilderPageContent[]; error: string | null }> {
   const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}`;
 
   try {
     const response = await fetch(url, { cache: 'no-store' }); // Disable caching for fresh data
-    const data: BuilderResponse = await response.json();
+    const data = await response.json();
 
     if (!data.results || data.results.length === 0) {
       console.warn("No results found.");
-      return { content: {}, urls: {}, error: null };
+      return { content: [], error: null };
     }
 
     // Function to clean HTML tags and trim text
@@ -68,31 +66,29 @@ export async function fetchBuilderTextContent(
       return texts;
     };
 
-    let formattedContent: BuilderContent = {};
-    // Object to store page URLs
-    const urls: Record<string, string> = {};
+    let formattedContent: BuilderPageContent[] = [];
 
     // Process each result and extract locale-specific content
-    data.results.forEach((result) => {
-      const pageTitle = result.data?.title || "Untitled";
+    data.results.forEach((result: any) => {
+      const pageTitle = result.data?.title || result.name || "Untitled";
+      const pageUrl = result.data?.url || result.data?.path || "#";
       const pageTexts = result.data?.blocks
         ? extractTextFields(result.data.blocks)
         : [];
 
-      // Extract URL from the result
-      if (result.data?.url || result.data?.path) {
-        urls[pageTitle] = result.data?.url || result.data?.path;
-      }
-
       if (pageTexts.length > 0) {
-        formattedContent[pageTitle] = pageTexts;
+        formattedContent.push({
+          title: pageTitle,
+          url: pageUrl,
+          content: pageTexts
+        });
       }
     });
 
-    return { content: formattedContent, urls, error: null };
+    return { content: formattedContent, error: null };
   } catch (err: any) {
     console.error("Error fetching content:", err);
-    return { content: {}, error: err.message };
+    return { content: [], error: err.message };
   }
 }
 

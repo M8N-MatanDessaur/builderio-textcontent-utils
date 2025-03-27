@@ -14,7 +14,7 @@ export interface ExtractBuilderContentOptions {
   /** Additional text field names to extract beyond the defaults */
   textFields?: string[];
   /** Custom content transformer function */
-  contentTransformer?: (content: Record<string, string[]>, rawResults: any[]) => Record<string, string[]>;
+  contentTransformer?: (content: BuilderPageContent[], rawResults: any[]) => BuilderPageContent[];
 }
 
 /**
@@ -31,24 +31,26 @@ export interface FetchBuilderContentOptions {
   /** Additional text field names to extract beyond the defaults */
   textFields?: string[];
   /** Custom content transformer function */
-  contentTransformer?: (content: Record<string, string[]>, rawResults: any[]) => Record<string, string[]>;
+  contentTransformer?: (content: BuilderPageContent[], rawResults: any[]) => BuilderPageContent[];
   /** Optional model name to filter by */
   model?: string;
   /** Optional query to filter content */
   query?: Record<string, any>;
   /** Custom fetch implementation (useful for server environments like Next.js) */
   fetchImplementation?: typeof fetch;
-  /** Include page URLs in the response (defaults to false) */
-  includeUrl?: boolean;
 }
 
 /**
- * Response type for fetchBuilderContent including URLs
- * @typedef {Object} BuilderContentResponse
+ * Structure for a single page of Builder.io content
+ * @typedef {Object} BuilderPageContent
  */
-export interface BuilderContentResponse {
-  content: Record<string, string[]>;
-  urls?: Record<string, string>;
+export interface BuilderPageContent {
+  /** The page title */
+  title: string;
+  /** The page URL */
+  url: string;
+  /** The extracted text content */
+  content: string[];
 }
 
 /**
@@ -127,7 +129,7 @@ function extractTextFieldsFromObject(
  * @public
  * @param {any[]} builderResults - Raw Builder.io API results
  * @param {ExtractBuilderContentOptions} [options={}] - Configuration options
- * @returns {Record<string, string[]>} Formatted content organized by page title
+ * @returns {BuilderPageContent[]} Formatted content organized by pages
  * @example
  * ```typescript
  * // Extract text from raw Builder.io results
@@ -140,7 +142,7 @@ function extractTextFieldsFromObject(
 export function extractBuilderContent(
   builderResults: any[],
   options: ExtractBuilderContentOptions = {}
-): Record<string, string[]> {
+): BuilderPageContent[] {
   const { 
     locale = "us-en",
     textFields = [],
@@ -149,17 +151,22 @@ export function extractBuilderContent(
 
   // Combine default and custom text fields
   const allTextFields = [...new Set([...DEFAULT_TEXT_FIELDS, ...textFields])];
-  let formattedContent: Record<string, string[]> = {};
+  let formattedContent: BuilderPageContent[] = [];
 
   // Process each result and extract locale-specific content
   builderResults.forEach((result: any) => {
     const pageTitle = result.data?.title || result.name || `Page-${result.id}`;
+    const pageUrl = result.data?.url || result.data?.path || "#";
     const pageTexts = result.data?.blocks
       ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields })
       : [];
 
     if (pageTexts.length > 0) {
-      formattedContent[pageTitle] = pageTexts;
+      formattedContent.push({
+        title: pageTitle,
+        url: pageUrl,
+        content: pageTexts
+      });
     }
   });
 
@@ -179,7 +186,7 @@ export function extractBuilderContent(
  * @async
  * @param {string} apiKey - Builder.io API key
  * @param {FetchBuilderContentOptions} [options={}] - Configuration options
- * @returns {Promise<BuilderContentResponse | Record<string, string[]>>} Promise resolving to formatted content and optional URLs
+ * @returns {Promise<BuilderPageContent[]>} Promise resolving to formatted content
  * @throws {Error} Throws if API key is missing or if the API request fails
  * @example
  * ```typescript
@@ -187,81 +194,61 @@ export function extractBuilderContent(
  * const content = await fetchBuilderContent('YOUR_API_KEY', {
  *   locale: 'en-US',
  *   model: 'page',
- *   query: { 'data.slug': 'home' },
- *   includeUrl: true // Set to true to include URLs
+ *   query: { 'data.slug': 'home' }
  * });
  * ```
  */
 export async function fetchBuilderContent(
   apiKey: string,
   options: FetchBuilderContentOptions = {}
-): Promise<BuilderContentResponse | Record<string, string[]>> {
+): Promise<BuilderPageContent[]> {
   const {
     locale = "us-en",
     apiUrl = "https://cdn.builder.io/api/v3/content",
     limit = 100,
     textFields = [],
-    contentTransformer,
     model = "page",
     query = {},
-    fetchImplementation,
-    includeUrl = false
+    contentTransformer,
+    fetchImplementation = fetch
   } = options;
 
   if (!apiKey) {
-    throw new Error("Builder API key is required");
+    throw new Error("Builder.io API key is required");
   }
 
-  // Build the API URL with query parameters
-  let url = `${apiUrl}/${model}?apiKey=${apiKey}&limit=${limit}`;
-  
-  // Add custom query parameters
-  Object.entries(query).forEach(([key, value]) => {
-    if (value !== undefined && value !== null) {
-      url += `&${encodeURIComponent(key)}=${encodeURIComponent(JSON.stringify(value))}`;
-    }
-  });
+  try {
+    // Construct API URL with query parameters
+    let apiUrlWithParams = `${apiUrl}/${model}?apiKey=${encodeURIComponent(apiKey)}`;
+    apiUrlWithParams += `&limit=${limit}`;
+    apiUrlWithParams += `&cachebust=${Date.now()}`;
 
-  // Use the provided fetch implementation or default fetch
-  const fetchFn = fetchImplementation || fetch;
-
-  const response = await fetchFn(url);
-      
-  if (!response.ok) {
-    throw new Error(`API request failed with status ${response.status}`);
-  }
-  
-  const data = await response.json();
-
-  if (!data.results || data.results.length === 0) {
-    console.warn("No results found.");
-    return includeUrl ? { content: {}, urls: {} } : {};
-  }
-
-  // Extract content
-  const content = extractBuilderContent(data.results, {
-    locale,
-    textFields,
-    contentTransformer
-  });
-
-  // If includeUrl is true, extract URLs and return a combined object
-  if (includeUrl) {
-    const urls: Record<string, string> = {};
-    
-    // Extract URLs from each result
-    data.results.forEach((result: any) => {
-      if (result.name && (result.data?.url || result.data?.path)) {
-        urls[result.name] = result.data?.url || result.data?.path;
-      }
+    // Add custom query parameters
+    Object.entries(query).forEach(([key, value]) => {
+      apiUrlWithParams += `&${encodeURIComponent(key)}=${encodeURIComponent(JSON.stringify(value))}`;
     });
-    
-    return {
-      content,
-      urls
-    };
-  }
 
-  // For backward compatibility, return just the content
-  return content;
+    // Fetch content from Builder.io
+    const response = await fetchImplementation(apiUrlWithParams);
+    
+    if (!response.ok) {
+      throw new Error(`API request failed with status ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.results || !Array.isArray(data.results)) {
+      return [];
+    }
+
+    // Extract and format content
+    return extractBuilderContent(data.results, {
+      locale,
+      textFields,
+      contentTransformer
+    });
+  } catch (error: any) {
+    console.error("Error fetching Builder.io content:", error);
+    throw new Error(`Failed to fetch content: ${error.message}`);
+  }
 }
