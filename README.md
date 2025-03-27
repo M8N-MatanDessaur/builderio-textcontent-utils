@@ -275,14 +275,4 @@ MIT
 
 ---
 
-This package is designed to work seamlessly with Next.js server components, API routes, and the metadata API. It makes content extraction from Builder.io more efficient for server-rendered applications.
-
-## CSS Breakpoint Standards
-
-When using this package with Builder.io projects, we recommend these standardized breakpoints to ensure consistency:
-
-- **Desktop**: 1221px and up
-- **Tablet**: 765px to 1220px
-- **Mobile**: 764px and below
-
-This aligns with Builder.io's breakpoint specifications and improves maintainability across projects.
+This package is designed to work seamlessly with Next.js server components, API routes, and the metadata API. It makes content extraction from Builder.io more efficient for server-rendered applications
