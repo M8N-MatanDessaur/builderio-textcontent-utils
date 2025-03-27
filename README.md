@@ -21,6 +21,7 @@ pnpm add builderio-textcontent-utils
 - TypeScript support
 - Next.js metadata API integration
 - Search functionality for content (ex for search pages)
+- Page URL retrieval for linking to content (added in v0.2.0)
 
 ## Setup
 
@@ -40,13 +41,20 @@ import { fetchBuilderContent } from 'builderio-textcontent-utils';
 // In a Next.js server component or API route
 export async function GET() {
   const apiKey = process.env.NEXT_PUBLIC_BUILDER_API_KEY || '';
-  const content = await fetchBuilderContent(apiKey, {
+  
+  // Fetch content with URLs included (added in v0.2.0)
+  const result = await fetchBuilderContent(apiKey, {
     locale: 'en-US',
     model: 'page',
-    limit: 20
+    limit: 20,
+    includeUrl: true // Add this to get URLs
   });
   
-  return Response.json({ content });
+  // Access content and URLs
+  const content = 'content' in result ? result.content : result;
+  const urls = 'urls' in result ? result.urls : {};
+  
+  return Response.json({ content, urls });
 }
 ```
 
@@ -74,6 +82,21 @@ export async function generateMetadata() {
     titleSuffix: ' | My Brand'
   });
 }
+
+// Fetch content with page URLs (added in v0.2.0)
+export async function fetchContentWithUrls() {
+  const result = await builderClient.fetchTextContent({
+    model: 'page',
+    includeUrl: true // Add this to get URLs
+  });
+  
+  // With includeUrl: true, result will have this structure:
+  // {
+  //   content: { "Page Title": ["text content", "more content"] },
+  //   urls: { "Page Title": "/page-url" }
+  // }
+  return result;
+}
 ```
 
 ### Searching Content
@@ -81,23 +104,33 @@ export async function generateMetadata() {
 ```typescript
 import { fetchBuilderContent, searchBuilderContent } from 'builderio-textcontent-utils';
 
-// In a Next.js API route for search
+// In a Next.js API route for search with URLs (added in v0.2.0)
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
   
-  // Get content from Builder.io
+  // Get content and URLs from Builder.io
   const apiKey = process.env.NEXT_PUBLIC_BUILDER_API_KEY || '';
-  const content = await fetchBuilderContent(apiKey);
+  const result = await fetchBuilderContent(apiKey, { includeUrl: true });
+  
+  // With includeUrl: true, we get { content, urls }
+  const content = 'content' in result ? result.content : result;
+  const urls = 'urls' in result ? result.urls : {};
   
   // Search through the content
-  const results = searchBuilderContent(content, query, {
+  const searchResults = searchBuilderContent(content, query, {
     caseSensitive: false,
     wholeWord: false,
     contextWords: 5
   });
   
-  return Response.json({ results });
+  // Add URLs to search results
+  const resultsWithUrls = searchResults.map(result => ({
+    ...result,
+    url: urls[result.page] || '#'
+  }));
+  
+  return Response.json({ results: resultsWithUrls });
 }
 ```
 
@@ -137,8 +170,29 @@ async function fetchBuilderContent(
     query?: Record<string, any>;
     contentTransformer?: (content: Record<string, string[]>, rawResults: any[]) => Record<string, string[]>;
     fetchImplementation?: typeof fetch;
+    includeUrl?: boolean; // Added in v0.2.0
   }
-): Promise<Record<string, string[]>>;
+): Promise<BuilderContentResponse | Record<string, string[]>>;
+
+// New in v0.2.0
+interface BuilderContentResponse {
+  content: Record<string, string[]>;
+  urls?: Record<string, string>;
+}
+```
+
+### fetchBuilderTextContent
+
+```typescript
+// Added in v0.2.0
+async function fetchBuilderTextContent(
+  apiKey: string,
+  locale?: string
+): Promise<{
+  content: Record<string, string[]>;
+  urls?: Record<string, string>;
+  error: string | null;
+}>;
 ```
 
 ### extractBuilderContent
@@ -164,7 +218,7 @@ function createBuilderClient(options: {
   textFields?: string[];
   fetchImplementation?: typeof fetch;
 }): {
-  fetchTextContent: (options?: object) => Promise<Record<string, string[]>>;
+  fetchTextContent: (options?: object) => Promise<BuilderContentResponse | Record<string, string[]>>; // Return type updated in v0.2.0
   extractContent: (builderResults: any[], options?: object) => Record<string, string[]>;
 };
 ```
@@ -199,17 +253,23 @@ function searchBuilderContent(
     contextWords?: number;
   }
 ): SearchResult[];
-
-interface SearchResult {
-  pageTitle: string;
-  text: string;
-  matchScore: number;
-  excerpt: string;
-  matchPosition: number;
-}
 ```
 
-## Next.js Integration
+## License
+
+MIT
+
+## Changelog
+
+### v0.2.0
+- Added page URL retrieval functionality with `includeUrl` option
+- Updated return types to support content and URLs in the same response
+- Enhanced fetchBuilderTextContent to include URLs in response
+
+### v0.1.0
+- Initial release
+
+---
 
 This package is designed to work seamlessly with Next.js server components, API routes, and the metadata API. It makes content extraction from Builder.io more efficient for server-rendered applications.
 
@@ -222,7 +282,3 @@ When using this package with Builder.io projects, we recommend these standardize
 - **Mobile**: 764px and below
 
 This aligns with Builder.io's breakpoint specifications and improves maintainability across projects.
-
-## License
-
-MIT
