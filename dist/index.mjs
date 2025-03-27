@@ -295,58 +295,119 @@ function escapeRegExp(string) {
 }
 
 // src/utils/fetchBuilderTextContent.ts
+var namedEntities = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  copy: "\xA9",
+  reg: "\xAE",
+  trade: "\u2122"
+  // Add more common entities if needed
+};
+var decodeHtmlEntities = (text) => {
+  return text.replace(
+    /&(?:#([0-9]+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g,
+    // Adjusted named entity part
+    (match, dec, hex, name) => {
+      if (dec) return String.fromCharCode(parseInt(dec, 10));
+      if (hex) return String.fromCharCode(parseInt(hex, 16));
+      if (name && namedEntities.hasOwnProperty(name)) return namedEntities[name];
+      return match;
+    }
+  );
+};
+var cleanText2 = (text) => {
+  let cleaned = String(text);
+  cleaned = cleaned.replace(/<[^>]*>/g, "");
+  cleaned = decodeHtmlEntities(cleaned);
+  cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, "$1");
+  cleaned = cleaned.replace(new RegExp("(?<!\\w)[*_](?!\\s)(.+?)(?<!\\s)[*_](?!\\w)", "g"), "$1");
+  cleaned = cleaned.replace(/\s+/g, " ");
+  cleaned = cleaned.trim();
+  return cleaned;
+};
 function fetchBuilderTextContent(apiKey, locale = "us-en") {
   return __async(this, null, function* () {
-    const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}`;
+    if (!apiKey) {
+      console.error("Builder.io API key is required.");
+      return { content: {}, error: "Builder.io API key is required." };
+    }
+    const url = `https://cdn.builder.io/api/v3/content/page?apiKey=${apiKey}&limit=100&fields=data.title,data.blocks`;
     try {
       const response = yield fetch(url, { cache: "no-store" });
+      if (!response.ok) {
+        const errorText = yield response.text();
+        console.error(`Error fetching content: ${response.status} ${response.statusText}`, errorText);
+        return { content: {}, error: `Failed to fetch content: ${response.status} ${response.statusText}` };
+      }
       const data = yield response.json();
       if (!data.results || data.results.length === 0) {
-        console.warn("No results found.");
-        return { content: [], error: null };
+        console.warn("No results found from Builder.io API.");
+        return { content: {}, error: null };
       }
-      const cleanText2 = (text) => {
-        if (!text) return "";
-        return String(text).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)).replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/\_\_(.+?)\_\_/g, "$1").replace(/\_(.+?)\_/g, "$1").replace(/\~\~(.+?)\~\~/g, "$1").replace(/\`(.+?)\`/g, "$1").replace(/\s+/g, " ").trim();
-      };
       const extractTextFields = (obj) => {
         let texts = [];
         if (typeof obj === "object" && obj !== null) {
+          if (obj["@type"] === "@builder.io/core:LocalizedValue") {
+            const localizedText = obj[locale] || obj["Default"];
+            if (localizedText && typeof localizedText === "string") {
+              const cleaned = cleanText2(localizedText);
+              if (cleaned) texts.push(cleaned);
+            }
+            return texts;
+          }
           Object.entries(obj).forEach(([key, value]) => {
-            if (key === "@type" && value === "@builder.io/core:LocalizedValue") {
-              const localizedText = obj[locale] || obj["Default"];
-              if (localizedText) {
-                texts.push(cleanText2(localizedText));
-              }
-            }
-            if (["text", "title", "textContent", "description"].includes(key) && typeof value === "string") {
-              texts.push(cleanText2(value));
-            }
-            if (typeof value === "object" && value !== null) {
+            const lowerKey = key.toLowerCase();
+            if (["text", "title", "heading", "subheading", "description", "caption", "label", "buttontext", "alttext", "name", "content", "plaintext", "summary", "testimonial", "blockquote"].includes(lowerKey) && typeof value === "string" && value.trim()) {
+              const cleaned = cleanText2(value);
+              if (cleaned) texts.push(cleaned);
+            } else if (typeof value === "object" && value !== null) {
               texts = texts.concat(extractTextFields(value));
+            } else if (Array.isArray(value)) {
+              value.forEach((item) => {
+                if (typeof item === "string" && item.trim()) {
+                  const cleaned = cleanText2(item);
+                  if (cleaned) texts.push(cleaned);
+                } else if (typeof item === "object" && item !== null) {
+                  texts = texts.concat(extractTextFields(item));
+                }
+              });
             }
           });
+        } else if (typeof obj === "string" && obj.trim()) {
+          const cleaned = cleanText2(obj);
+          if (cleaned) texts.push(cleaned);
         }
-        return texts;
+        return [...new Set(texts)].filter(Boolean);
       };
-      let formattedContent = [];
-      data.results.forEach((result) => {
-        var _a, _b, _c, _d;
-        const pageTitle = ((_a = result.data) == null ? void 0 : _a.title) || result.name || "Untitled";
-        const pageUrl = ((_b = result.data) == null ? void 0 : _b.url) || ((_c = result.data) == null ? void 0 : _c.path) || "#";
-        const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFields(result.data.blocks) : [];
+      let formattedContent = {};
+      data.results.forEach((result, index) => {
+        var _a, _b;
+        const rawTitle = (_a = result.data) == null ? void 0 : _a.title;
+        const cleanedTitle = rawTitle ? cleanText2(rawTitle) : "";
+        const pageTitle = cleanedTitle || `Untitled Page ${index + 1}`;
+        const pageTexts = ((_b = result.data) == null ? void 0 : _b.blocks) ? extractTextFields(result.data.blocks) : [];
+        if (cleanedTitle && !pageTexts.includes(cleanedTitle)) {
+          pageTexts.unshift(cleanedTitle);
+        }
         if (pageTexts.length > 0) {
-          formattedContent.push({
-            title: pageTitle,
-            url: pageUrl,
-            content: pageTexts
-          });
+          if (formattedContent[pageTitle]) {
+            const existingTexts = new Set(formattedContent[pageTitle]);
+            pageTexts.forEach((text) => existingTexts.add(text));
+            formattedContent[pageTitle] = Array.from(existingTexts);
+          } else {
+            formattedContent[pageTitle] = pageTexts;
+          }
         }
       });
       return { content: formattedContent, error: null };
     } catch (err) {
-      console.error("Error fetching content:", err);
-      return { content: [], error: err.message };
+      console.error("Error processing Builder.io content:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      return { content: {}, error: `Error processing content: ${errorMessage}` };
     }
   });
 }

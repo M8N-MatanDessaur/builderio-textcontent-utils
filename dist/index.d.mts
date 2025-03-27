@@ -253,15 +253,17 @@ declare function searchBuilderContent(content: BuilderPageContent[], searchTerm:
  * Server-side utility to fetch and extract text content from Builder.io API
  * @file fetchBuilderTextContent.ts
  */
-
+interface BuilderContent {
+    [pageTitle: string]: string[];
+}
 /**
- * Fetches text content from Builder.io
- * @param {string} apiKey - Builder.io API key
- * @param {string} [locale="us-en"] - Content locale
- * @returns {Promise<{ content: BuilderPageContent[]; error: string | null }>} Promise resolving to text content
+ * Fetches and processes content from Builder.io API
+ * @param apiKey - Builder.io API key
+ * @param locale - Locale for content (default: "us-en")
+ * @returns Promise containing content and error status
  */
 declare function fetchBuilderTextContent(apiKey: string, locale?: string): Promise<{
-    content: BuilderPageContent[];
+    content: BuilderContent;
     error: string | null;
 }>;
 
