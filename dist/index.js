@@ -328,11 +328,12 @@ function calculateFinalScore(baseScore, textLength) {
   return baseScore * (50 / Math.max(textLength, 50));
 }
 function generateExcerpt(text, matchIndex, matchLength, contextWords) {
-  const words = text.split(/\s+/);
+  const cleanedText = cleanText(text);
+  const words = cleanedText.split(/\s+/);
   const fullWordArray = [];
   let currentPosition = 0;
   words.forEach((word) => {
-    const startPos = text.indexOf(word, currentPosition);
+    const startPos = cleanedText.indexOf(word, currentPosition);
     const endPos = startPos + word.length;
     const wordOverlapsMatch = startPos <= matchIndex + matchLength - 1 && endPos > matchIndex;
     fullWordArray.push({
@@ -343,16 +344,16 @@ function generateExcerpt(text, matchIndex, matchLength, contextWords) {
   });
   const matchWordIndex = fullWordArray.findIndex((w) => w.isMatch);
   if (matchWordIndex === -1) {
-    return text.substring(
+    return cleanedText.substring(
       Math.max(0, matchIndex - 50),
-      Math.min(text.length, matchIndex + matchLength + 50)
+      Math.min(cleanedText.length, matchIndex + matchLength + 50)
     );
   }
   const startIndex = Math.max(0, matchWordIndex - contextWords);
   const endIndex = Math.min(fullWordArray.length, matchWordIndex + contextWords + 1);
   let excerpt = "";
   if (startIndex > 0) excerpt += "... ";
-  excerpt += fullWordArray.slice(startIndex, endIndex).map((item) => item.isMatch ? `**${item.word}**` : item.word).join(" ");
+  excerpt += fullWordArray.slice(startIndex, endIndex).map((item) => item.word).join(" ");
   if (endIndex < fullWordArray.length) excerpt += " ...";
   return excerpt;
 }

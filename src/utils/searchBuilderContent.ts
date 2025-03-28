@@ -84,8 +84,7 @@ export function searchBuilderContent(
     }
     
     page.content.forEach((text) => {
-      // Note: text should already be cleaned by extractBuilderContent 
-      // but we'll ensure it's clean here for consistency
+      // Clean the text of any formatting or HTML entities
       const cleanedText = cleanText(text);
       const normalizedText = caseSensitive ? cleanedText : cleanedText.toLowerCase();
       
@@ -176,8 +175,11 @@ function generateExcerpt(
   matchLength: number, 
   contextWords: number
 ): string {
+  // Ensure text is cleaned of any formatting before generating excerpt
+  const cleanedText = cleanText(text);
+  
   // Split the text into words
-  const words = text.split(/\s+/);
+  const words = cleanedText.split(/\s+/);
   const fullWordArray: {word: string, isMatch: boolean}[] = [];
   
   // Track current position in the text
@@ -185,7 +187,7 @@ function generateExcerpt(
   
   // Map each word with its position information
   words.forEach(word => {
-    const startPos = text.indexOf(word, currentPosition);
+    const startPos = cleanedText.indexOf(word, currentPosition);
     const endPos = startPos + word.length;
     
     // Check if this word is part of the match
@@ -206,9 +208,9 @@ function generateExcerpt(
   
   if (matchWordIndex === -1) {
     // Fallback if word detection failed
-    return text.substring(
+    return cleanedText.substring(
       Math.max(0, matchIndex - 50),
-      Math.min(text.length, matchIndex + matchLength + 50)
+      Math.min(cleanedText.length, matchIndex + matchLength + 50)
     );
   }
   
@@ -216,13 +218,13 @@ function generateExcerpt(
   const startIndex = Math.max(0, matchWordIndex - contextWords);
   const endIndex = Math.min(fullWordArray.length, matchWordIndex + contextWords + 1);
   
-  // Build the excerpt
+  // Build the excerpt - plain text only, no styling
   let excerpt = '';
   if (startIndex > 0) excerpt += '... ';
   
   excerpt += fullWordArray
     .slice(startIndex, endIndex)
-    .map(item => item.isMatch ? `**${item.word}**` : item.word)
+    .map(item => item.word)
     .join(' ');
   
   if (endIndex < fullWordArray.length) excerpt += ' ...';

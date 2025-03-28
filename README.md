@@ -2,12 +2,13 @@
 
 A server-side utility package for fetching and processing content from Builder.io, designed for Next.js projects.
 
-## What's New in v1.1.0
+## What's New in v1.1.1
 
 - **Enhanced Text Cleaning**: All extracted text is now consistently cleaned from rich text formatting and HTML entities
 - **Improved Content Quality**: Text like `**Bold** Text with&nbsp;_formatting_` is now properly converted to plain text
 - **Consistent Processing**: Unified text cleaning implementation across all utilities
 - **Better Search Results**: Search functionality now works properly with formatted content
+- **Plain Text Excerpts**: Search result excerpts now contain only plain text without any styling
 
 ## Installation
 
