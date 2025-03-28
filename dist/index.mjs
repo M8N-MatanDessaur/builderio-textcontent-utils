@@ -35,12 +35,48 @@ var __async = (__this, __arguments, generator) => {
   });
 };
 
+// src/utils/textCleaner.ts
+var namedEntities = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  nbsp: " ",
+  copy: "\xA9",
+  reg: "\xAE",
+  trade: "\u2122"
+  // Add more common entities if needed
+};
+var decodeHtmlEntities = (text) => {
+  return text.replace(
+    /&(?:#([0-9]+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g,
+    (match, dec, hex, name) => {
+      if (dec) return String.fromCharCode(parseInt(dec, 10));
+      if (hex) return String.fromCharCode(parseInt(hex, 16));
+      if (name && namedEntities.hasOwnProperty(name)) return namedEntities[name];
+      return match;
+    }
+  );
+};
+var cleanText = (text) => {
+  if (!text) return "";
+  let cleaned = String(text);
+  cleaned = cleaned.replace(/<[^>]*>/g, "");
+  cleaned = decodeHtmlEntities(cleaned);
+  cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, "$1");
+  cleaned = cleaned.replace(/\*(.+?)\*/g, "$1");
+  cleaned = cleaned.replace(/\_\_(.+?)\_\_/g, "$1");
+  cleaned = cleaned.replace(/\_(.+?)\_/g, "$1");
+  cleaned = cleaned.replace(/\~\~(.+?)\~\~/g, "$1");
+  cleaned = cleaned.replace(/\`(.+?)\`/g, "$1");
+  cleaned = cleaned.replace(/\s+/g, " ");
+  cleaned = cleaned.trim();
+  return cleaned;
+};
+
 // src/utils/extractBuilderContent.ts
 var DEFAULT_TEXT_FIELDS = ["text", "title", "textContent", "description"];
-function cleanText(text) {
-  if (!text) return "";
-  return String(text).replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec)).replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16))).replace(/\*\*(.+?)\*\*/g, "$1").replace(/\*(.+?)\*/g, "$1").replace(/\_\_(.+?)\_\_/g, "$1").replace(/\_(.+?)\_/g, "$1").replace(/\~\~(.+?)\~\~/g, "$1").replace(/\`(.+?)\`/g, "$1").replace(/\s+/g, " ").trim();
-}
 function extractTextFieldsFromObject(obj, options) {
   const { locale, textFields } = options;
   let texts = [];
@@ -198,13 +234,14 @@ function searchBuilderContent(content, searchTerm, options = {}) {
   if (!searchTerm || searchTerm.trim() === "") {
     return [];
   }
+  const cleanedSearchTerm = cleanText(searchTerm);
   const {
     caseSensitive = false,
     wholeWord = false,
     minScore = 0.1,
     contextWords = 5
   } = options;
-  const normalizedSearchTerm = caseSensitive ? searchTerm : searchTerm.toLowerCase();
+  const normalizedSearchTerm = caseSensitive ? cleanedSearchTerm : cleanedSearchTerm.toLowerCase();
   const results = [];
   const wholeWordRegex = wholeWord ? new RegExp(`\\b${escapeRegExp(normalizedSearchTerm)}\\b`, caseSensitive ? "g" : "gi") : null;
   content.forEach((page) => {
@@ -213,23 +250,24 @@ function searchBuilderContent(content, searchTerm, options = {}) {
       return;
     }
     page.content.forEach((text) => {
-      const normalizedText = caseSensitive ? text : text.toLowerCase();
+      const cleanedText = cleanText(text);
+      const normalizedText = caseSensitive ? cleanedText : cleanedText.toLowerCase();
       let matchScore = 0;
       let matchFound = false;
       let matchPosition = -1;
       if (wholeWord && wholeWordRegex) {
         wholeWordRegex.lastIndex = 0;
         let match;
-        while ((match = wholeWordRegex.exec(text)) !== null) {
+        while ((match = wholeWordRegex.exec(cleanedText)) !== null) {
           matchScore += 2;
           matchFound = true;
           matchPosition = match.index;
-          const excerpt = generateExcerpt(text, match.index, match[0].length, contextWords);
+          const excerpt = generateExcerpt(cleanedText, match.index, match[0].length, contextWords);
           results.push({
             pageTitle: page.title,
             pageUrl: page.url,
-            text,
-            matchScore: calculateFinalScore(matchScore, text.length),
+            text: cleanedText,
+            matchScore: calculateFinalScore(matchScore, cleanedText.length),
             excerpt,
             matchPosition: match.index
           });
@@ -241,12 +279,12 @@ function searchBuilderContent(content, searchTerm, options = {}) {
           matchScore += 1;
           matchFound = true;
           matchPosition = position;
-          const excerpt = generateExcerpt(text, position, normalizedSearchTerm.length, contextWords);
+          const excerpt = generateExcerpt(cleanedText, position, normalizedSearchTerm.length, contextWords);
           results.push({
             pageTitle: page.title,
             pageUrl: page.url,
-            text,
-            matchScore: calculateFinalScore(matchScore, text.length),
+            text: cleanedText,
+            matchScore: calculateFinalScore(matchScore, cleanedText.length),
             excerpt,
             matchPosition: position
           });
@@ -295,40 +333,6 @@ function escapeRegExp(string) {
 }
 
 // src/utils/fetchBuilderTextContent.ts
-var namedEntities = {
-  amp: "&",
-  lt: "<",
-  gt: ">",
-  quot: '"',
-  apos: "'",
-  nbsp: " ",
-  copy: "\xA9",
-  reg: "\xAE",
-  trade: "\u2122"
-  // Add more common entities if needed
-};
-var decodeHtmlEntities = (text) => {
-  return text.replace(
-    /&(?:#([0-9]+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g,
-    // Adjusted named entity part
-    (match, dec, hex, name) => {
-      if (dec) return String.fromCharCode(parseInt(dec, 10));
-      if (hex) return String.fromCharCode(parseInt(hex, 16));
-      if (name && namedEntities.hasOwnProperty(name)) return namedEntities[name];
-      return match;
-    }
-  );
-};
-var cleanText2 = (text) => {
-  let cleaned = String(text);
-  cleaned = cleaned.replace(/<[^>]*>/g, "");
-  cleaned = decodeHtmlEntities(cleaned);
-  cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, "$1");
-  cleaned = cleaned.replace(new RegExp("(?<!\\w)[*_](?!\\s)(.+?)(?<!\\s)[*_](?!\\w)", "g"), "$1");
-  cleaned = cleaned.replace(/\s+/g, " ");
-  cleaned = cleaned.trim();
-  return cleaned;
-};
 function fetchBuilderTextContent(apiKey, locale = "us-en") {
   return __async(this, null, function* () {
     if (!apiKey) {
@@ -354,7 +358,7 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
           if (obj["@type"] === "@builder.io/core:LocalizedValue") {
             const localizedText = obj[locale] || obj["Default"];
             if (localizedText && typeof localizedText === "string") {
-              const cleaned = cleanText2(localizedText);
+              const cleaned = cleanText(localizedText);
               if (cleaned) texts.push(cleaned);
             }
             return texts;
@@ -362,14 +366,14 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
           Object.entries(obj).forEach(([key, value]) => {
             const lowerKey = key.toLowerCase();
             if (["text", "title", "heading", "subheading", "description", "caption", "label", "buttontext", "alttext", "name", "content", "plaintext", "summary", "testimonial", "blockquote"].includes(lowerKey) && typeof value === "string" && value.trim()) {
-              const cleaned = cleanText2(value);
+              const cleaned = cleanText(value);
               if (cleaned) texts.push(cleaned);
             } else if (typeof value === "object" && value !== null) {
               texts = texts.concat(extractTextFields(value));
             } else if (Array.isArray(value)) {
               value.forEach((item) => {
                 if (typeof item === "string" && item.trim()) {
-                  const cleaned = cleanText2(item);
+                  const cleaned = cleanText(item);
                   if (cleaned) texts.push(cleaned);
                 } else if (typeof item === "object" && item !== null) {
                   texts = texts.concat(extractTextFields(item));
@@ -378,7 +382,7 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
             }
           });
         } else if (typeof obj === "string" && obj.trim()) {
-          const cleaned = cleanText2(obj);
+          const cleaned = cleanText(obj);
           if (cleaned) texts.push(cleaned);
         }
         return [...new Set(texts)].filter(Boolean);
@@ -387,7 +391,7 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
       data.results.forEach((result, index) => {
         var _a, _b;
         const rawTitle = (_a = result.data) == null ? void 0 : _a.title;
-        const cleanedTitle = rawTitle ? cleanText2(rawTitle) : "";
+        const cleanedTitle = rawTitle ? cleanText(rawTitle) : "";
         const pageTitle = cleanedTitle || `Untitled Page ${index + 1}`;
         const pageTexts = ((_b = result.data) == null ? void 0 : _b.blocks) ? extractTextFields(result.data.blocks) : [];
         if (cleanedTitle && !pageTexts.includes(cleanedTitle)) {

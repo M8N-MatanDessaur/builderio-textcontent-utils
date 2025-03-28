@@ -3,6 +3,9 @@
  * @file fetchBuilderTextContent.ts
  */
 
+// Import shared text cleaner
+import { cleanText } from './textCleaner';
+
 // Define TypeScript interfaces
 export interface BuilderContent {
   [pageTitle: string]: string[];
@@ -19,57 +22,6 @@ interface BuilderResponse {
   }[];
   [key: string]: any;
 }
-
-/**
- * Basic map for decoding common named HTML entities.
- */
-const namedEntities: { [key: string]: string } = {
-  amp: '&',  lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
-  copy: '©', reg: '®', trade: '™',
-  // Add more common entities if needed
-};
-
-/**
- * Decodes HTML character entities (named, decimal, hexadecimal) without external libs.
- */
-const decodeHtmlEntities = (text: string): string => {
-  return text.replace(
-    /&(?:#([0-9]+)|#x([0-9a-fA-F]+)|([a-zA-Z0-9]+));/g, // Adjusted named entity part
-    (match, dec, hex, name) => {
-      if (dec) return String.fromCharCode(parseInt(dec, 10));
-      if (hex) return String.fromCharCode(parseInt(hex, 16));
-      if (name && namedEntities.hasOwnProperty(name)) return namedEntities[name];
-      return match; // Keep unrecognized entities as is
-    }
-  );
-};
-
-/**
- * Cleans text: Removes HTML, Decodes Entities, Removes ** * _ formatting, Normalizes whitespace.
- */
-const cleanText = (text: string | any): string => {
-  let cleaned = String(text);
-
-  // 1. Remove HTML tags
-  cleaned = cleaned.replace(/<[^>]*>/g, "");
-
-  // 2. Decode HTML entities (Corrected approach)
-  cleaned = decodeHtmlEntities(cleaned);
-
-  // 3. Remove specific Markdown formatting (using slightly safer regexes)
-  cleaned = cleaned.replace(/\*\*(.*?)\*\*/g, '$1'); // Bold
-  // Use lookarounds for * and _ to avoid removing them within words.
-  // This targets * or _ surrounded by non-word characters or start/end of line.
-  cleaned = cleaned.replace(/(?<!\w)[*_](?!\s)(.+?)(?<!\s)[*_](?!\w)/g, '$1'); // Italic/Underscore
-
-  // 4. Normalize whitespace (replace multiple spaces/newlines with single space)
-  cleaned = cleaned.replace(/\s+/g, " ");
-
-  // 5. Trim leading/trailing whitespace
-  cleaned = cleaned.trim();
-
-  return cleaned;
-};
 
 /**
  * Fetches and processes content from Builder.io API

@@ -4,6 +4,9 @@
  * @description Server-side utilities for fetching and extracting text content from Builder.io
  */
 
+// Import shared text cleaner
+import { cleanText } from './textCleaner';
+
 /**
  * Configuration options for extracting text content from Builder.io content
  * @typedef {Object} ExtractBuilderContentOptions
@@ -59,40 +62,6 @@ export interface BuilderPageContent {
  * @constant {string[]}
  */
 const DEFAULT_TEXT_FIELDS = ["text", "title", "textContent", "description"];
-
-/**
- * Clean HTML tags, entities, and markdown formatting from text
- * @private
- * @param {string} text - Text to clean
- * @returns {string} Cleaned text
- */
-function cleanText(text: string): string {
-  if (!text) return "";
-  
-  return String(text)
-    // Remove HTML tags
-    .replace(/<[^>]*>/g, "")
-    // Replace common HTML entities
-    .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    // Replace decimal and hex HTML entities
-    .replace(/&#(\d+);/g, (match, dec) => String.fromCharCode(dec))
-    .replace(/&#x([0-9a-f]+);/gi, (match, hex) => String.fromCharCode(parseInt(hex, 16)))
-    // Remove markdown formatting symbols
-    .replace(/\*\*(.+?)\*\*/g, "$1") // Bold
-    .replace(/\*(.+?)\*/g, "$1")     // Italic
-    .replace(/\_\_(.+?)\_\_/g, "$1") // Bold
-    .replace(/\_(.+?)\_/g, "$1")     // Italic
-    .replace(/\~\~(.+?)\~\~/g, "$1") // Strikethrough
-    .replace(/\`(.+?)\`/g, "$1")     // Code
-    // Normalize whitespace
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 /**
  * Extracts text fields from an object based on the specified locale

@@ -1,4 +1,5 @@
 import { BuilderPageContent } from './extractBuilderContent';
+import { cleanText } from './textCleaner';
 
 /**
  * Search interface to represent a search result
@@ -56,6 +57,9 @@ export function searchBuilderContent(
     return [];
   }
   
+  // Clean the search term of any formatting or HTML entities
+  const cleanedSearchTerm = cleanText(searchTerm);
+  
   const {
     caseSensitive = false,
     wholeWord = false,
@@ -63,7 +67,7 @@ export function searchBuilderContent(
     contextWords = 5
   } = options;
 
-  const normalizedSearchTerm = caseSensitive ? searchTerm : searchTerm.toLowerCase();
+  const normalizedSearchTerm = caseSensitive ? cleanedSearchTerm : cleanedSearchTerm.toLowerCase();
   const results: SearchResult[] = [];
 
   // Create whole word regex pattern if needed
@@ -80,7 +84,10 @@ export function searchBuilderContent(
     }
     
     page.content.forEach((text) => {
-      const normalizedText = caseSensitive ? text : text.toLowerCase();
+      // Note: text should already be cleaned by extractBuilderContent 
+      // but we'll ensure it's clean here for consistency
+      const cleanedText = cleanText(text);
+      const normalizedText = caseSensitive ? cleanedText : cleanedText.toLowerCase();
       
       // Calculate match score 
       let matchScore = 0;
@@ -92,19 +99,19 @@ export function searchBuilderContent(
         // Reset regex lastIndex
         wholeWordRegex.lastIndex = 0;
         let match;
-        while ((match = wholeWordRegex.exec(text)) !== null) {
+        while ((match = wholeWordRegex.exec(cleanedText)) !== null) {
           matchScore += 2; // Whole word matches get higher score
           matchFound = true;
           matchPosition = match.index;
           
           // Generate excerpt for this match
-          const excerpt = generateExcerpt(text, match.index, match[0].length, contextWords);
+          const excerpt = generateExcerpt(cleanedText, match.index, match[0].length, contextWords);
           
           results.push({
             pageTitle: page.title,
             pageUrl: page.url,
-            text,
-            matchScore: calculateFinalScore(matchScore, text.length),
+            text: cleanedText,
+            matchScore: calculateFinalScore(matchScore, cleanedText.length),
             excerpt,
             matchPosition: match.index
           });
@@ -120,13 +127,13 @@ export function searchBuilderContent(
           matchPosition = position;
           
           // Generate excerpt for this match
-          const excerpt = generateExcerpt(text, position, normalizedSearchTerm.length, contextWords);
+          const excerpt = generateExcerpt(cleanedText, position, normalizedSearchTerm.length, contextWords);
           
           results.push({
             pageTitle: page.title,
             pageUrl: page.url,
-            text,
-            matchScore: calculateFinalScore(matchScore, text.length),
+            text: cleanedText,
+            matchScore: calculateFinalScore(matchScore, cleanedText.length),
             excerpt,
             matchPosition: position
           });

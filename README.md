@@ -2,6 +2,13 @@
 
 A server-side utility package for fetching and processing content from Builder.io, designed for Next.js projects.
 
+## What's New in v1.1.0
+
+- **Enhanced Text Cleaning**: All extracted text is now consistently cleaned from rich text formatting and HTML entities
+- **Improved Content Quality**: Text like `**Bold** Text with&nbsp;_formatting_` is now properly converted to plain text
+- **Consistent Processing**: Unified text cleaning implementation across all utilities
+- **Better Search Results**: Search functionality now works properly with formatted content
+
 ## Installation
 
 ```bash
@@ -21,7 +28,13 @@ pnpm add builderio-textcontent-utils
 - TypeScript support
 - Next.js metadata API integration
 - Search functionality for content (ex for search pages)
-- Page URLs automatically included in content structure (v0.3.0+)
+- Page URLs automatically included in content structure
+- **Enhanced text cleaning** that properly handles:
+  - HTML tags removal
+  - HTML named entities (e.g., `&amp;`, `&lt;`, `&nbsp;`)
+  - HTML numeric entities (e.g., `&#160;`, `&#x00A0;`)
+  - Rich text formatting markers (bold, italic, underline)
+  - Whitespace normalization
 
 ## Setup
 
@@ -50,6 +63,7 @@ export async function GET() {
   });
   
   // Content is now an array of pages, each with title, url, and content
+  // All text is properly cleaned from HTML and rich text formatting
   return Response.json({ content });
 }
 ```
@@ -100,40 +114,27 @@ import { fetchBuilderContent, searchBuilderContent } from 'builderio-textcontent
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const query = searchParams.get('q') || '';
-  
-  // Get content from Builder.io (URLs automatically included)
   const apiKey = process.env.NEXT_PUBLIC_BUILDER_API_KEY || '';
-  const content = await fetchBuilderContent(apiKey);
   
-  // Search through the content
-  const searchResults = searchBuilderContent(content, query, {
-    caseSensitive: false,
-    wholeWord: false,
-    contextWords: 5
-  });
-  
-  // Search results already include pageTitle and pageUrl properties
-  return Response.json({ results: searchResults });
-}
-```
-
-### Custom Content Processing
-
-```typescript
-import { extractBuilderContent } from 'builderio-textcontent-utils';
-
-// Extract content from raw Builder.io data
-function processBuilderData(builderData) {
-  const content = extractBuilderContent(builderData, {
+  // Fetch all content first
+  const content = await fetchBuilderContent(apiKey, {
     locale: 'en-US',
-    textFields: ['subtitle', 'buttonText', 'altText'],
-    contentTransformer: (content, rawResults) => {
-      // Custom transformation logic
-      return content;
-    }
+    model: 'page'
   });
   
-  return content;
+  // If query exists, perform search
+  if (query) {
+    // With v1.1.0, search now works properly with rich text and HTML entities
+    // For example, searching for "Installation" will find "**One-Day** &nbsp;_Installation_"
+    const results = searchBuilderContent(content, query, {
+      caseSensitive: false,
+      contextWords: 8
+    });
+    
+    return Response.json({ results });
+  }
+  
+  return Response.json({ content });
 }
 ```
 
