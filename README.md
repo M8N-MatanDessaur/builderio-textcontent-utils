@@ -2,13 +2,12 @@
 
 A server-side utility package for fetching and processing content from Builder.io, designed for Next.js projects.
 
-## What's New in v1.1.1
+## What's New in v1.2.0
 
-- **Enhanced Text Cleaning**: All extracted text is now consistently cleaned from rich text formatting and HTML entities
-- **Improved Content Quality**: Text like `**Bold** Text with&nbsp;_formatting_` is now properly converted to plain text
-- **Consistent Processing**: Unified text cleaning implementation across all utilities
-- **Better Search Results**: Search functionality now works properly with formatted content
-- **Plain Text Excerpts**: Search result excerpts now contain only plain text without any styling
+- **Improved Localization**: Added configurable locale fallback chain for better multilingual support
+- **Title Localization**: Titles are now properly localized using the same mechanism as content
+- **Default Locale Change**: Changed default locale to "Default" for better compatibility
+- **Configurable Fallback**: Added `defaultLocale` parameter to control the fallback chain
 
 ## Installation
 
@@ -43,6 +42,7 @@ Add your Builder.io API key to your environment variables:
 
 ```
 NEXT_PUBLIC_BUILDER_API_KEY=your_builder_api_key_here
+NEXT_PUBLIC_DEFAULT_LOCALE=Default  # Optional: can be customized (e.g., "us-en")
 ```
 
 ## Usage Examples
@@ -59,6 +59,7 @@ export async function GET() {
   // Fetch content (URLs automatically included)
   const content = await fetchBuilderContent(apiKey, {
     locale: 'en-US',
+    defaultLocale: 'us-en',  // Optional: fallback locale if content not found in primary locale
     model: 'page',
     limit: 20
   });
@@ -77,7 +78,8 @@ import { createBuilderClient, generateMetadataFromContent } from 'builderio-text
 // Create a reusable client
 const builderClient = createBuilderClient({
   apiKey: process.env.NEXT_PUBLIC_BUILDER_API_KEY || '',
-  locale: 'en-US'
+  locale: 'en-US',
+  defaultLocale: 'us-en'  // Optional: fallback locale if content not found in primary locale
 });
 
 // In a Next.js app
@@ -139,6 +141,32 @@ export async function GET(request) {
 }
 ```
 
+### Locale Fallback Chain
+
+The package now implements a locale fallback chain to handle multilingual content gracefully:
+
+1. Try the specified `locale` first
+2. If content is not found, fall back to the specified `defaultLocale`
+3. If still not found, use "Default" as the ultimate fallback
+
+This applies to both content and titles from Builder.io.
+
+```typescript
+// Example: Setting custom locale and fallback
+const content = await fetchBuilderContent(apiKey, {
+  locale: 'fr-CA',           // Try French Canadian first
+  defaultLocale: 'en-US',    // Fall back to US English if not found
+  model: 'page'
+});
+
+// Using environment variables for configuration
+const content = await fetchBuilderContent(apiKey, {
+  locale: selectedLocale,    // Dynamic locale based on user selection
+  defaultLocale: process.env.NEXT_PUBLIC_DEFAULT_LOCALE || 'Default',
+  model: 'page'
+});
+```
+
 ## API Reference
 
 ### Data Structures
@@ -146,7 +174,7 @@ export async function GET(request) {
 ```typescript
 // Page content structure returned by all functions
 interface BuilderPageContent {
-  title: string;    // The page title
+  title: string;    // The page title (properly localized)
   url: string;      // The page URL
   content: string[]; // Array of extracted text content
 }
@@ -158,7 +186,8 @@ interface BuilderPageContent {
 async function fetchBuilderContent(
   apiKey: string,
   options?: {
-    locale?: string;
+    locale?: string;          // Primary locale (default: "Default")
+    defaultLocale?: string;   // Fallback locale (default: "Default") 
     apiUrl?: string;
     limit?: number;
     textFields?: string[];
@@ -176,7 +205,8 @@ async function fetchBuilderContent(
 function extractBuilderContent(
   builderResults: any[],
   options?: {
-    locale?: string;
+    locale?: string;          // Primary locale (default: "Default")
+    defaultLocale?: string;   // Fallback locale (default: "Default")
     textFields?: string[];
     contentTransformer?: (content: BuilderPageContent[], rawResults: any[]) => BuilderPageContent[];
   }
@@ -215,6 +245,7 @@ function searchBuilderContent(
 function createBuilderClient(options: {
   apiKey: string;
   locale?: string;
+  defaultLocale?: string;
   apiUrl?: string;
   textFields?: string[];
   fetchImplementation?: typeof fetch;
@@ -244,11 +275,3 @@ function generateMetadataFromContent(
   }
 };
 ```
-
-## Changes in v0.3.0
-
-- Unified content structure: URLs are now automatically included with each page
-- Improved content organization with a cleaner, more intuitive API
-- Enhanced search results that include page URLs by default
-- Better TypeScript types and documentation
-- Optimized for Next.js applications
