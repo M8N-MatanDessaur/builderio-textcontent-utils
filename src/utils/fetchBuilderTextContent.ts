@@ -118,7 +118,17 @@ export async function fetchBuilderTextContent(
     data.results.forEach((result, index) => {
       // Clean the title and provide a fallback
       const rawTitle = result.data?.title;
-      const cleanedTitle = rawTitle ? cleanText(rawTitle) : '';
+      let cleanedTitle = '';
+      
+      // Handle localized title if it's a LocalizedValue object
+      if (rawTitle && typeof rawTitle === 'object' && rawTitle['@type'] === '@builder.io/core:LocalizedValue') {
+        // Get the localized title based on locale with fallback chain: locale → defaultLocale → "Default"
+        const localizedTitle = rawTitle[locale] || rawTitle["Default"];
+        cleanedTitle = localizedTitle ? cleanText(localizedTitle) : '';
+      } else {
+        cleanedTitle = rawTitle ? cleanText(rawTitle) : '';
+      }
+      
       const pageTitle = cleanedTitle || `Untitled Page ${index + 1}`; // Use cleaned title or fallback
 
       const pageTexts = result.data?.blocks

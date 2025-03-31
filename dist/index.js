@@ -136,7 +136,13 @@ function extractBuilderContent(builderResults, options = {}) {
   let formattedContent = [];
   builderResults.forEach((result) => {
     var _a, _b, _c, _d;
-    const pageTitle = ((_a = result.data) == null ? void 0 : _a.title) || result.name || `Page-${result.id}`;
+    let pageTitle = "";
+    const titleValue = (_a = result.data) == null ? void 0 : _a.title;
+    if (titleValue && typeof titleValue === "object" && titleValue["@type"] === "@builder.io/core:LocalizedValue") {
+      pageTitle = titleValue[locale] || titleValue["Default"] || result.name || `Page-${result.id}`;
+    } else {
+      pageTitle = titleValue || result.name || `Page-${result.id}`;
+    }
     const pageUrl = ((_b = result.data) == null ? void 0 : _b.url) || ((_c = result.data) == null ? void 0 : _c.path) || "#";
     const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields }) : [];
     if (pageTexts.length > 0) {
@@ -420,7 +426,13 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
       data.results.forEach((result, index) => {
         var _a, _b;
         const rawTitle = (_a = result.data) == null ? void 0 : _a.title;
-        const cleanedTitle = rawTitle ? cleanText(rawTitle) : "";
+        let cleanedTitle = "";
+        if (rawTitle && typeof rawTitle === "object" && rawTitle["@type"] === "@builder.io/core:LocalizedValue") {
+          const localizedTitle = rawTitle[locale] || rawTitle["Default"];
+          cleanedTitle = localizedTitle ? cleanText(localizedTitle) : "";
+        } else {
+          cleanedTitle = rawTitle ? cleanText(rawTitle) : "";
+        }
         const pageTitle = cleanedTitle || `Untitled Page ${index + 1}`;
         const pageTexts = ((_b = result.data) == null ? void 0 : _b.blocks) ? extractTextFields(result.data.blocks) : [];
         if (cleanedTitle && !pageTexts.includes(cleanedTitle)) {

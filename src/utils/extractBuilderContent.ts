@@ -145,7 +145,18 @@ export function extractBuilderContent(
 
   // Process each result and extract locale-specific content
   builderResults.forEach((result: any) => {
-    const pageTitle = result.data?.title || result.name || `Page-${result.id}`;
+    // Handle localized title if it's a LocalizedValue object
+    let pageTitle = '';
+    const titleValue = result.data?.title;
+    
+    if (titleValue && typeof titleValue === 'object' && titleValue['@type'] === '@builder.io/core:LocalizedValue') {
+      // Get the localized title based on locale with fallback chain: locale → defaultLocale → "Default"
+      pageTitle = titleValue[locale] || titleValue["Default"] || result.name || `Page-${result.id}`;
+    } else {
+      // Handle regular string title
+      pageTitle = titleValue || result.name || `Page-${result.id}`;
+    }
+    
     const pageUrl = result.data?.url || result.data?.path || "#";
     const pageTexts = result.data?.blocks
       ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields })
