@@ -12,8 +12,10 @@ import { cleanText } from './textCleaner';
  * @typedef {Object} ExtractBuilderContentOptions
  */
 export interface ExtractBuilderContentOptions {
-  /** Content locale (defaults to 'us-en' if not provided) */
+  /** Content locale (defaults to 'Default' if not provided) */
   locale?: string;
+  /** Default locale to fall back to if the requested locale is not available */
+  defaultLocale?: string;
   /** Additional text field names to extract beyond the defaults */
   textFields?: string[];
   /** Custom content transformer function */
@@ -25,8 +27,10 @@ export interface ExtractBuilderContentOptions {
  * @typedef {Object} FetchBuilderContentOptions
  */
 export interface FetchBuilderContentOptions {
-  /** Content locale (defaults to 'us-en' if not provided) */
+  /** Content locale (defaults to 'Default' if not provided) */
   locale?: string;
+  /** Default locale to fall back to if the requested locale is not available */
+  defaultLocale?: string;
   /** API base URL (defaults to standard Builder.io API URL) */
   apiUrl?: string;
   /** Number of items to fetch (defaults to 100) */
@@ -69,6 +73,7 @@ const DEFAULT_TEXT_FIELDS = ["text", "title", "textContent", "description"];
  * @param {any} obj - Object to extract text from
  * @param {Object} options - Extraction options
  * @param {string} options.locale - Content locale
+ * @param {string} options.defaultLocale - Default locale to fall back to
  * @param {string[]} options.textFields - Field names to extract
  * @returns {string[]} Array of extracted texts
  */
@@ -76,10 +81,11 @@ function extractTextFieldsFromObject(
   obj: any,
   options: {
     locale: string;
+    defaultLocale: string;
     textFields: string[];
   }
 ): string[] {
-  const { locale, textFields } = options;
+  const { locale, defaultLocale, textFields } = options;
   let texts: string[] = [];
 
   if (typeof obj === "object" && obj !== null) {
@@ -89,7 +95,7 @@ function extractTextFieldsFromObject(
         key === "@type" &&
         value === "@builder.io/core:LocalizedValue"
       ) {
-        const localizedText = obj[locale] || obj["Default"];
+        const localizedText = obj[locale] || obj[defaultLocale] || obj["Default"];
         if (localizedText) {
           texts.push(cleanText(localizedText));
         }
@@ -105,7 +111,7 @@ function extractTextFieldsFromObject(
 
       // Recursively process nested objects
       if (typeof value === "object" && value !== null) {
-        texts = texts.concat(extractTextFieldsFromObject(value, { locale, textFields }));
+        texts = texts.concat(extractTextFieldsFromObject(value, { locale, defaultLocale, textFields }));
       }
     });
   }
@@ -134,7 +140,8 @@ export function extractBuilderContent(
   options: ExtractBuilderContentOptions = {}
 ): BuilderPageContent[] {
   const { 
-    locale = "us-en",
+    locale = "Default",
+    defaultLocale = "Default",
     textFields = [],
     contentTransformer
   } = options;
@@ -145,10 +152,21 @@ export function extractBuilderContent(
 
   // Process each result and extract locale-specific content
   builderResults.forEach((result: any) => {
-    const pageTitle = result.data?.title || result.name || `Page-${result.id}`;
+    // Handle localized title if it's a LocalizedValue object
+    let pageTitle = '';
+    const titleValue = result.data?.title;
+    
+    if (titleValue && typeof titleValue === 'object' && titleValue['@type'] === '@builder.io/core:LocalizedValue') {
+      // Get the localized title based on locale with fallback chain: locale → defaultLocale → "Default"
+      pageTitle = titleValue[locale] || titleValue[defaultLocale] || titleValue["Default"] || result.name || `Page-${result.id}`;
+    } else {
+      // Handle regular string title
+      pageTitle = titleValue || result.name || `Page-${result.id}`;
+    }
+    
     const pageUrl = result.data?.url || result.data?.path || "#";
     const pageTexts = result.data?.blocks
-      ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields })
+      ? extractTextFieldsFromObject(result.data.blocks, { locale, defaultLocale, textFields: allTextFields })
       : [];
 
     if (pageTexts.length > 0) {
@@ -193,7 +211,8 @@ export async function fetchBuilderContent(
   options: FetchBuilderContentOptions = {}
 ): Promise<BuilderPageContent[]> {
   const {
-    locale = "us-en",
+    locale = "Default",
+    defaultLocale = "Default",
     apiUrl = "https://cdn.builder.io/api/v3/content",
     limit = 100,
     textFields = [],
@@ -234,6 +253,7 @@ export async function fetchBuilderContent(
     // Extract and format content
     return extractBuilderContent(data.results, {
       locale,
+      defaultLocale,
       textFields,
       contentTransformer
     });

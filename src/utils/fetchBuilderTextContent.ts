@@ -26,12 +26,14 @@ interface BuilderResponse {
 /**
  * Fetches and processes content from Builder.io API
  * @param apiKey - Builder.io API key
- * @param locale - Locale for content (default: "us-en")
+ * @param locale - Locale for content (default: "Default")
+ * @param defaultLocale - Default locale to fall back to (default: "Default")
  * @returns Promise containing content and error status
  */
 export async function fetchBuilderTextContent(
   apiKey: string,
-  locale: string = "us-en"
+  locale: string = "Default",
+  defaultLocale: string = "Default"
 ): Promise<{ content: BuilderContent; error: string | null }> {
   // Ensure API key is provided
   if (!apiKey) {
@@ -66,7 +68,7 @@ export async function fetchBuilderTextContent(
       if (typeof obj === "object" && obj !== null) {
         // Handle LocalizedValue directly
         if (obj["@type"] === "@builder.io/core:LocalizedValue") {
-          const localizedText = obj[locale] || obj["Default"];
+          const localizedText = obj[locale] || obj[defaultLocale] || obj["Default"];
           if (localizedText && typeof localizedText === 'string') {
              const cleaned = cleanText(localizedText);
              if (cleaned) texts.push(cleaned); // Only add if non-empty
@@ -118,7 +120,17 @@ export async function fetchBuilderTextContent(
     data.results.forEach((result, index) => {
       // Clean the title and provide a fallback
       const rawTitle = result.data?.title;
-      const cleanedTitle = rawTitle ? cleanText(rawTitle) : '';
+      let cleanedTitle = '';
+      
+      // Handle localized title if it's a LocalizedValue object
+      if (rawTitle && typeof rawTitle === 'object' && rawTitle['@type'] === '@builder.io/core:LocalizedValue') {
+        // Get the localized title based on locale with fallback chain: locale → defaultLocale → "Default"
+        const localizedTitle = rawTitle[locale] || rawTitle[defaultLocale] || rawTitle["Default"];
+        cleanedTitle = localizedTitle ? cleanText(localizedTitle) : '';
+      } else {
+        cleanedTitle = rawTitle ? cleanText(rawTitle) : '';
+      }
+      
       const pageTitle = cleanedTitle || `Untitled Page ${index + 1}`; // Use cleaned title or fallback
 
       const pageTexts = result.data?.blocks

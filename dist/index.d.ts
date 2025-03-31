@@ -8,8 +8,10 @@
  * @typedef {Object} ExtractBuilderContentOptions
  */
 interface ExtractBuilderContentOptions {
-    /** Content locale (defaults to 'us-en' if not provided) */
+    /** Content locale (defaults to 'Default' if not provided) */
     locale?: string;
+    /** Default locale to fall back to if the requested locale is not available */
+    defaultLocale?: string;
     /** Additional text field names to extract beyond the defaults */
     textFields?: string[];
     /** Custom content transformer function */
@@ -20,8 +22,10 @@ interface ExtractBuilderContentOptions {
  * @typedef {Object} FetchBuilderContentOptions
  */
 interface FetchBuilderContentOptions {
-    /** Content locale (defaults to 'us-en' if not provided) */
+    /** Content locale (defaults to 'Default' if not provided) */
     locale?: string;
+    /** Default locale to fall back to if the requested locale is not available */
+    defaultLocale?: string;
     /** API base URL (defaults to standard Builder.io API URL) */
     apiUrl?: string;
     /** Number of items to fetch (defaults to 100) */
@@ -105,10 +109,15 @@ interface BuilderPluginOptions {
      */
     apiKey: string;
     /**
-     * Content locale (defaults to 'us-en' if not provided)
-     * @default 'us-en'
+     * Content locale (defaults to 'Default' if not provided)
+     * @default 'Default'
      */
     locale?: string;
+    /**
+     * Default locale to fall back to if the requested locale is not available
+     * @default 'Default'
+     */
+    defaultLocale?: string;
     /**
      * API URL for Builder.io (defaults to standard API URL)
      * @default 'https://cdn.builder.io/api/v3/content'
@@ -151,17 +160,17 @@ interface BuilderPluginOptions {
 declare function createBuilderClient(options: BuilderPluginOptions): {
     /**
      * Fetch text content from Builder.io
-     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
+     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'defaultLocale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
      * @returns {Promise<BuilderPageContent[]>} Promise resolving to text content
      */
-    fetchTextContent: (fetchOptions?: Omit<FetchBuilderContentOptions, "apiKey" | "locale" | "apiUrl" | "textFields" | "fetchImplementation">) => Promise<BuilderPageContent[]>;
+    fetchTextContent: (fetchOptions?: Omit<FetchBuilderContentOptions, "apiKey" | "locale" | "defaultLocale" | "apiUrl" | "textFields" | "fetchImplementation">) => Promise<BuilderPageContent[]>;
     /**
      * Extract text from Builder.io content data
      * @param {any[]} builderResults - Raw Builder.io data
-     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'textFields'>} [extractOptions] - Options for extraction
+     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'defaultLocale' | 'textFields'>} [extractOptions] - Options for extraction
      * @returns {BuilderPageContent[]} Formatted content
      */
-    extractContent: (builderResults: any[], extractOptions?: Omit<ExtractBuilderContentOptions, "locale" | "textFields">) => BuilderPageContent[];
+    extractContent: (builderResults: any[], extractOptions?: Omit<ExtractBuilderContentOptions, "locale" | "defaultLocale" | "textFields">) => BuilderPageContent[];
 };
 /**
  * Generate metadata from Builder.io content
@@ -259,10 +268,11 @@ interface BuilderContent {
 /**
  * Fetches and processes content from Builder.io API
  * @param apiKey - Builder.io API key
- * @param locale - Locale for content (default: "us-en")
+ * @param locale - Locale for content (default: "Default")
+ * @param defaultLocale - Default locale to fall back to (default: "Default")
  * @returns Promise containing content and error status
  */
-declare function fetchBuilderTextContent(apiKey: string, locale?: string): Promise<{
+declare function fetchBuilderTextContent(apiKey: string, locale?: string, defaultLocale?: string): Promise<{
     content: BuilderContent;
     error: string | null;
 }>;
