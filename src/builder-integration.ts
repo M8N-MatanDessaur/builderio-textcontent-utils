@@ -19,10 +19,16 @@ export interface BuilderPluginOptions {
   apiKey: string;
   
   /**
-   * Content locale (defaults to 'us-en' if not provided)
-   * @default 'us-en'
+   * Content locale (defaults to 'Default' if not provided)
+   * @default 'Default'
    */
   locale?: string;
+  
+  /**
+   * Default locale to fall back to if the requested locale is not available
+   * @default 'Default'
+   */
+  defaultLocale?: string;
   
   /**
    * API URL for Builder.io (defaults to standard API URL)
@@ -69,7 +75,8 @@ export interface BuilderPluginOptions {
 export function createBuilderClient(options: BuilderPluginOptions) {
   const {
     apiKey,
-    locale = 'us-en',
+    locale = 'Default',
+    defaultLocale = 'Default',
     apiUrl,
     textFields = [],
     fetchImplementation
@@ -84,12 +91,13 @@ export function createBuilderClient(options: BuilderPluginOptions) {
   return {
     /**
      * Fetch text content from Builder.io
-     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
+     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'defaultLocale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
      * @returns {Promise<BuilderPageContent[]>} Promise resolving to text content
      */
-    fetchTextContent: async (fetchOptions: Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'> = {}) => {
+    fetchTextContent: async (fetchOptions: Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'defaultLocale' | 'apiUrl' | 'textFields' | 'fetchImplementation'> = {}) => {
       return fetchBuilderContent(apiKey, {
         locale,
+        defaultLocale,
         apiUrl,
         textFields,
         fetchImplementation,
@@ -100,12 +108,13 @@ export function createBuilderClient(options: BuilderPluginOptions) {
     /**
      * Extract text from Builder.io content data
      * @param {any[]} builderResults - Raw Builder.io data
-     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'textFields'>} [extractOptions] - Options for extraction
+     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'defaultLocale' | 'textFields'>} [extractOptions] - Options for extraction
      * @returns {BuilderPageContent[]} Formatted content
      */
-    extractContent: (builderResults: any[], extractOptions?: Omit<ExtractBuilderContentOptions, 'locale' | 'textFields'>) => {
+    extractContent: (builderResults: any[], extractOptions?: Omit<ExtractBuilderContentOptions, 'locale' | 'defaultLocale' | 'textFields'>) => {
       return extractBuilderContent(builderResults, {
         locale,
+        defaultLocale,
         textFields,
         ...extractOptions
       });

@@ -78,12 +78,12 @@ var cleanText = (text) => {
 // src/utils/extractBuilderContent.ts
 var DEFAULT_TEXT_FIELDS = ["text", "title", "textContent", "description"];
 function extractTextFieldsFromObject(obj, options) {
-  const { locale, textFields } = options;
+  const { locale, defaultLocale, textFields } = options;
   let texts = [];
   if (typeof obj === "object" && obj !== null) {
     Object.entries(obj).forEach(([key, value]) => {
       if (key === "@type" && value === "@builder.io/core:LocalizedValue") {
-        const localizedText = obj[locale] || obj["Default"];
+        const localizedText = obj[locale] || obj[defaultLocale] || obj["Default"];
         if (localizedText) {
           texts.push(cleanText(localizedText));
         }
@@ -92,7 +92,7 @@ function extractTextFieldsFromObject(obj, options) {
         texts.push(cleanText(value));
       }
       if (typeof value === "object" && value !== null) {
-        texts = texts.concat(extractTextFieldsFromObject(value, { locale, textFields }));
+        texts = texts.concat(extractTextFieldsFromObject(value, { locale, defaultLocale, textFields }));
       }
     });
   }
@@ -100,7 +100,8 @@ function extractTextFieldsFromObject(obj, options) {
 }
 function extractBuilderContent(builderResults, options = {}) {
   const {
-    locale = "us-en",
+    locale = "Default",
+    defaultLocale = "Default",
     textFields = [],
     contentTransformer
   } = options;
@@ -111,12 +112,12 @@ function extractBuilderContent(builderResults, options = {}) {
     let pageTitle = "";
     const titleValue = (_a = result.data) == null ? void 0 : _a.title;
     if (titleValue && typeof titleValue === "object" && titleValue["@type"] === "@builder.io/core:LocalizedValue") {
-      pageTitle = titleValue[locale] || titleValue["Default"] || result.name || `Page-${result.id}`;
+      pageTitle = titleValue[locale] || titleValue[defaultLocale] || titleValue["Default"] || result.name || `Page-${result.id}`;
     } else {
       pageTitle = titleValue || result.name || `Page-${result.id}`;
     }
     const pageUrl = ((_b = result.data) == null ? void 0 : _b.url) || ((_c = result.data) == null ? void 0 : _c.path) || "#";
-    const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFieldsFromObject(result.data.blocks, { locale, textFields: allTextFields }) : [];
+    const pageTexts = ((_d = result.data) == null ? void 0 : _d.blocks) ? extractTextFieldsFromObject(result.data.blocks, { locale, defaultLocale, textFields: allTextFields }) : [];
     if (pageTexts.length > 0) {
       formattedContent.push({
         title: pageTitle,
@@ -133,7 +134,8 @@ function extractBuilderContent(builderResults, options = {}) {
 function fetchBuilderContent(_0) {
   return __async(this, arguments, function* (apiKey, options = {}) {
     const {
-      locale = "us-en",
+      locale = "Default",
+      defaultLocale = "Default",
       apiUrl = "https://cdn.builder.io/api/v3/content",
       limit = 100,
       textFields = [],
@@ -162,6 +164,7 @@ function fetchBuilderContent(_0) {
       }
       return extractBuilderContent(data.results, {
         locale,
+        defaultLocale,
         textFields,
         contentTransformer
       });
@@ -176,7 +179,8 @@ function fetchBuilderContent(_0) {
 function createBuilderClient(options) {
   const {
     apiKey,
-    locale = "us-en",
+    locale = "Default",
+    defaultLocale = "Default",
     apiUrl,
     textFields = [],
     fetchImplementation
@@ -187,12 +191,13 @@ function createBuilderClient(options) {
   return {
     /**
      * Fetch text content from Builder.io
-     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
+     * @param {Omit<FetchBuilderContentOptions, 'apiKey' | 'locale' | 'defaultLocale' | 'apiUrl' | 'textFields' | 'fetchImplementation'>} [fetchOptions={}] - Additional fetch options
      * @returns {Promise<BuilderPageContent[]>} Promise resolving to text content
      */
     fetchTextContent: (..._0) => __async(this, [..._0], function* (fetchOptions = {}) {
       return fetchBuilderContent(apiKey, __spreadValues({
         locale,
+        defaultLocale,
         apiUrl,
         textFields,
         fetchImplementation
@@ -201,12 +206,13 @@ function createBuilderClient(options) {
     /**
      * Extract text from Builder.io content data
      * @param {any[]} builderResults - Raw Builder.io data
-     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'textFields'>} [extractOptions] - Options for extraction
+     * @param {Omit<ExtractBuilderContentOptions, 'locale' | 'defaultLocale' | 'textFields'>} [extractOptions] - Options for extraction
      * @returns {BuilderPageContent[]} Formatted content
      */
     extractContent: (builderResults, extractOptions) => {
       return extractBuilderContent(builderResults, __spreadValues({
         locale,
+        defaultLocale,
         textFields
       }, extractOptions));
     }
@@ -340,7 +346,7 @@ function escapeRegExp(string) {
 }
 
 // src/utils/fetchBuilderTextContent.ts
-function fetchBuilderTextContent(apiKey, locale = "us-en") {
+function fetchBuilderTextContent(apiKey, locale = "Default", defaultLocale = "Default") {
   return __async(this, null, function* () {
     if (!apiKey) {
       console.error("Builder.io API key is required.");
@@ -363,7 +369,7 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
         let texts = [];
         if (typeof obj === "object" && obj !== null) {
           if (obj["@type"] === "@builder.io/core:LocalizedValue") {
-            const localizedText = obj[locale] || obj["Default"];
+            const localizedText = obj[locale] || obj[defaultLocale] || obj["Default"];
             if (localizedText && typeof localizedText === "string") {
               const cleaned = cleanText(localizedText);
               if (cleaned) texts.push(cleaned);
@@ -400,7 +406,7 @@ function fetchBuilderTextContent(apiKey, locale = "us-en") {
         const rawTitle = (_a = result.data) == null ? void 0 : _a.title;
         let cleanedTitle = "";
         if (rawTitle && typeof rawTitle === "object" && rawTitle["@type"] === "@builder.io/core:LocalizedValue") {
-          const localizedTitle = rawTitle[locale] || rawTitle["Default"];
+          const localizedTitle = rawTitle[locale] || rawTitle[defaultLocale] || rawTitle["Default"];
           cleanedTitle = localizedTitle ? cleanText(localizedTitle) : "";
         } else {
           cleanedTitle = rawTitle ? cleanText(rawTitle) : "";
