@@ -1,8 +1,9 @@
 # Builder.io Content Utils
 
-A server-side utility package for fetching and processing content from Builder.io, designed for Next.js projects.
+A server-side utility package for fetching and processing content from Builder.io.
 
-## What's New in v1.2.0
+
+## What's New in v1.2.1
 
 - **Improved Localization**: Added configurable locale fallback chain for better multilingual support
 - **Title Localization**: Titles are now properly localized using the same mechanism as content
